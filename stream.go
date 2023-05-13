@@ -4,7 +4,7 @@ package stream
 type Chan[T comparable] chan T
 type ChanChan[T comparable] chan Chan[T]
 
-// Take filters a channel to only return n items and then close.
+// Take returns only n items from the main channel.
 func (c Chan[T]) Take(n int) Chan[T] {
 	output := make(Chan[T])
 
@@ -22,8 +22,8 @@ func (c Chan[T]) Take(n int) Chan[T] {
 	return output
 }
 
-// Until closes a channel when the predicate returns true, otherwise it wll keep
-// returning values. The predicate is called for each value.
+// Until closes a channel when the passed function returns true, otherwise it
+// wll keep returning values. The function is called once for each value.
 func (c Chan[T]) Until(f func(val T) bool) Chan[T] {
 	output := make(Chan[T])
 
@@ -44,8 +44,8 @@ func (c Chan[T]) Until(f func(val T) bool) Chan[T] {
 	return output
 }
 
-// Map maps channel values based on the function argument.
-// The function is called for each value.
+// Map mutates main channel values based on the passed function.
+// The function is called once for each value.
 func (c Chan[T]) Map(f func(val T) T) Chan[T] {
 	output := make(Chan[T])
 
@@ -63,8 +63,8 @@ func (c Chan[T]) Map(f func(val T) T) Chan[T] {
 	return output
 }
 
-// Filter filters channel values based on the predicate returning true.
-// The predicate is called for each value.
+// Filter filters main channel values based on the passed function returning true.
+// The function is called once for each value.
 func (c Chan[T]) Filter(f func(val T) bool) Chan[T] {
 	output := make(Chan[T])
 
@@ -84,8 +84,8 @@ func (c Chan[T]) Filter(f func(val T) bool) Chan[T] {
 	return output
 }
 
-// Reduce reduces the channel values to one value based on the function
-// argument. The function is called for each value.
+// Reduce reduces main channel values to one value based on the passed function.
+// The function is called once for each value.
 func (c Chan[T]) Reduce(f func(a, b T) T) Chan[T] {
 	output := make(Chan[T])
 
@@ -117,8 +117,8 @@ func (c Chan[T]) Last() Chan[T] {
 	return output
 }
 
-// Chain will append values from the passed channels when the main channel is
-// exhausted.
+// Chain will append values from the passed channels to the end of the main
+// channel.
 func (c Chan[T]) Chain(b Chan[T], args ...Chan[T]) Chan[T] {
 	output := make(Chan[T])
 
@@ -140,8 +140,8 @@ func (c Chan[T]) Chain(b Chan[T], args ...Chan[T]) Chan[T] {
 	return output
 }
 
-// Zip will alternate taking values from the passed channels and the main
-// channel. If any one channel is exhausted the returned channel will close.
+// Zip will take alternate values from the passed channels and the main channel.
+// If any one channel is exhausted, the returned channel will close.
 func (c Chan[T]) Zip(b Chan[T], args ...Chan[T]) Chan[T] {
 	output := make(Chan[T])
 
@@ -172,7 +172,8 @@ func (c Chan[T]) Zip(b Chan[T], args ...Chan[T]) Chan[T] {
 	return output
 }
 
-// Chunk returns a channel full of channels of the passed length.
+// Chunk returns a channel full of channels of the passed length containing
+// separated values of the main channel.
 func (c Chan[T]) Chunk(n int) ChanChan[T] {
 	output := make(ChanChan[T])
 
@@ -199,7 +200,7 @@ func (c Chan[T]) Chunk(n int) ChanChan[T] {
 	return output
 }
 
-// Drop removes n values from the channel before continuing.
+// Drop removes n values from the main channel before continuing.
 func (c Chan[T]) Drop(n int) Chan[T] {
 	output := make(Chan[T])
 
@@ -212,6 +213,50 @@ func (c Chan[T]) Drop(n int) Chan[T] {
 			}
 		}
 		for val := range c {
+			output <- val
+		}
+	}()
+
+	return output
+}
+
+// Stride steps over channel values returning every n value of the main channel.
+func (c Chan[T]) Stride(n int) Chan[T] {
+	output := make(Chan[T])
+
+	go func() {
+		defer close(output)
+		i := 0
+		for val := range c {
+			if i%n == 0 {
+				output <- val
+				i = 0
+			}
+			i++
+		}
+	}()
+
+	return output
+}
+
+// Tail returns a channel of the last n values of the main channel.
+func (c Chan[T]) Tail(n int) Chan[T] {
+	output := make(Chan[T])
+
+	go func() {
+		defer close(output)
+		tail := make(Chan[T], n)
+		i := 0
+		for val := range c {
+			if i >= n {
+				<-tail
+			} else {
+				i++
+			}
+			tail <- val
+		}
+		close(tail)
+		for val := range tail {
 			output <- val
 		}
 	}()

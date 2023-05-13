@@ -156,3 +156,17 @@ func TestDrop(t *testing.T) {
 	assert.Equal(t, empty, c.Drop(5).Slice())
 	assert.Equal(t, empty, c.Drop(5).Slice())
 }
+
+func TestStride(t *testing.T) {
+	expected := []int{1, 4, 7, 10, 13, 16, 19, 22, 25, 28}
+	actual := Iota(1, 100, 1).Stride(3).Take(10).Slice()
+
+	assert.Equal(t, expected, actual)
+}
+
+func TestTail(t *testing.T) {
+	expected := []int{17, 18, 19}
+	actual := Iota(1, 20, 1).Tail(3).Slice()
+
+	assert.Equal(t, expected, actual)
+}
