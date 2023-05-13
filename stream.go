@@ -172,27 +172,7 @@ func (c Chan[T]) Zip(b Chan[T], args ...Chan[T]) Chan[T] {
 	return output
 }
 
-// Chunk returns a channel full of slices of the passed length.
-// func (c Chan[T]) Chunk(n int) SliceChan[T] {
-// 	output := make(SliceChan[T])
-
-// 	go func() {
-// 		defer close(output)
-// 		for {
-// 			chunk := c.Take(n).Slice()
-// 			if len(chunk) == 0 {
-// 				return
-// 			}
-// 			output <- chunk
-// 			if len(chunk) < n {
-// 				return
-// 			}
-// 		}
-// 	}()
-
-// 	return output
-// }
-
+// Chunk returns a channel full of channels of the passed length.
 func (c Chan[T]) Chunk(n int) ChanChan[T] {
 	output := make(ChanChan[T])
 
