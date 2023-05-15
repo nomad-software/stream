@@ -7,6 +7,12 @@ import (
 	"unsafe"
 )
 
+// Drain drains the main channel of all values.
+func (c Chan[T]) Drain() {
+	for range c {
+	}
+}
+
 // Slice returns a slice containing the channel values once the channel closes.
 func (c Chan[T]) Slice() []T {
 	output := make([]T, 0)

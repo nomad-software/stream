@@ -7,6 +7,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestDrain(t *testing.T) {
+	c := FromString("Lorem ipsum dolor sit amet")
+
+	assert.Equal(t, 'L', <-c)
+	assert.Equal(t, 'o', <-c)
+
+	c.Drain()
+
+	assert.Equal(t, int32(0), <-c)
+}
+
 func TestSlice(t *testing.T) {
 	expected := []int{1, 2, 3, 4}
 	actual := Iota(1, 5, 1).Slice()
