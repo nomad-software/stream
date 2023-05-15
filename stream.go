@@ -140,31 +140,35 @@ func (c Chan[T]) Chain(b Chan[T], args ...Chan[T]) Chan[T] {
 	return output
 }
 
-// Zip will take alternate values from the passed channels and the main channel.
-// If any one channel is exhausted, the returned channel will close.
-func (c Chan[T]) Zip(b Chan[T], args ...Chan[T]) Chan[T] {
+// RoundRobin will take alternate values from the passed channels and the main channel.
+// It will return values until all channels are exhausted.
+func (c Chan[T]) RoundRobin(b Chan[T], args ...Chan[T]) Chan[T] {
 	output := make(Chan[T])
 
 	go func() {
 		defer close(output)
 		for {
+			available := false
 			val, ok := <-c
-			if !ok {
-				return
+			if ok {
+				available = true
+				output <- val
 			}
-			output <- val
 			val, ok = <-b
-			if !ok {
-				return
+			if ok {
+				available = true
+				output <- val
 			}
-			output <- val
 			for _, arg := range args {
 				val, ok = <-arg
-				if !ok {
-					return
+				if ok {
+					available = true
+					output <- val
 				}
-				output <- val
 				break
+			}
+			if !available {
+				return
 			}
 		}
 	}()
@@ -258,6 +262,41 @@ func (c Chan[T]) Tail(n int) Chan[T] {
 		close(tail)
 		for val := range tail {
 			output <- val
+		}
+	}()
+
+	return output
+}
+
+// Zip returns a channel of channels containing the next values of the main
+// channel and all other passed channels
+func (c Chan[T]) Zip(b Chan[T], args ...Chan[T]) ChanChan[T] {
+	output := make(ChanChan[T])
+
+	go func() {
+		defer close(output)
+		for {
+			zip := make(Chan[T], len(args)+2)
+			val, ok := <-c
+			if !ok {
+				return
+			}
+			zip <- val
+			val, ok = <-b
+			if !ok {
+				return
+			}
+			zip <- val
+			for _, arg := range args {
+				val, ok = <-arg
+				if !ok {
+					return
+				}
+				zip <- val
+				break
+			}
+			close(zip)
+			output <- zip
 		}
 	}()
 

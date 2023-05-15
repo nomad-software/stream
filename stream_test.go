@@ -99,35 +99,35 @@ func TestChain(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestZipVariadic1(t *testing.T) {
-	expected := "0aA1bB2cC3dD4eE5fF6gG7hH8"
-
-	a := FromString("0123456789")
-	b := FromString("abcdefgh") // Stops the zip
-	c := FromString("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	actual := a.Zip(b, c).String()
-
-	assert.Equal(t, expected, actual)
-}
-
-func TestZipVariadic2(t *testing.T) {
-	expected := "0aA1bB2cC3dD4eE5f"
+func TestRoundRobinVariadic1(t *testing.T) {
+	expected := "0aA1bB2cC3dD4eE5fF6gG7hH8I9JKLMNOPQRSTUVWXYZ"
 
 	a := FromString("0123456789")
 	b := FromString("abcdefgh")
-	c := FromString("ABCDE") // Stops the zip
-	actual := a.Zip(b, c).String()
+	c := FromString("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	actual := a.RoundRobin(b, c).String()
 
 	assert.Equal(t, expected, actual)
 }
 
-func TestZip(t *testing.T) {
-	expected := "0AaB1CbD2EcF3GdH4IeJ5KfL6MgN7OhP8QiR9SjT"
+func TestRoundRobinVariadic2(t *testing.T) {
+	expected := "0aA1bB2cC3dD4eE5f6g7h89"
 
-	a := FromString("0123456789") // Stops the zip
+	a := FromString("0123456789")
+	b := FromString("abcdefgh")
+	c := FromString("ABCDE")
+	actual := a.RoundRobin(b, c).String()
+
+	assert.Equal(t, expected, actual)
+}
+
+func TestRoundRobin(t *testing.T) {
+	expected := "0AaB1CbD2EcF3GdH4IeJ5KfL6MgN7OhP8QiR9SjTkUlVmWnXoYpZqrstuvwxyz"
+
+	a := FromString("0123456789")
 	b := FromString("abcdefghijklmnopqrstuvwxyz")
 	c := FromString("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	actual := a.Zip(b).Zip(c).String()
+	actual := a.RoundRobin(b).RoundRobin(c).String()
 
 	assert.Equal(t, expected, actual)
 }
@@ -169,4 +169,58 @@ func TestTail(t *testing.T) {
 	actual := Iota(1, 20, 1).Tail(3).Slice()
 
 	assert.Equal(t, expected, actual)
+}
+
+func TestZipVariadic1(t *testing.T) {
+	expected := [][]rune{
+		{'0', 'a', 'A'},
+		{'1', 'b', 'B'},
+		{'2', 'c', 'C'},
+		{'3', 'd', 'D'},
+	}
+	a := FromString("0123") // Stops the zip
+	b := FromString("abcdefg")
+	c := FromString("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	i := 0
+	for c := range a.Zip(b, c) {
+		actual := c.Slice()
+		assert.Equal(t, expected[i], actual)
+		i++
+	}
+}
+
+func TestZipVariadic2(t *testing.T) {
+	expected := [][]rune{
+		{'0', 'a', 'A'},
+		{'1', 'b', 'B'},
+		{'2', 'c', 'C'},
+		{'3', 'd', 'D'},
+	}
+	a := FromString("0123456789")
+	b := FromString("abcd") // Stops the zip
+	c := FromString("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	i := 0
+	for c := range a.Zip(b, c) {
+		actual := c.Slice()
+		assert.Equal(t, expected[i], actual)
+		i++
+	}
+}
+
+func TestZipVariadic3(t *testing.T) {
+	expected := [][]rune{
+		{'0', 'a', 'A'},
+		{'1', 'b', 'B'},
+		{'2', 'c', 'C'},
+		{'3', 'd', 'D'},
+	}
+	a := FromString("0123456789")
+	b := FromString("abcdefghi")
+	c := FromString("ABCD") // Stops the zip
+	i := 0
+	for c := range a.Zip(b, c) {
+		actual := c.Slice()
+		assert.Equal(t, expected[i], actual)
+		i++
+	}
 }
