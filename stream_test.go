@@ -252,3 +252,12 @@ func TestPadLeftExceeded(t *testing.T) {
 
 	assert.Equal(t, expected, actual)
 }
+
+func TestTee(t *testing.T) {
+	expected := []int{1, 2, 3, 4, 5}
+	tee := 0
+	actual := Iota(1, 6, 1).Tee(func(val int) { tee = val }).Slice()
+
+	assert.Equal(t, expected, actual)
+	assert.Equal(t, 5, tee)
+}

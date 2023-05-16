@@ -352,3 +352,19 @@ func (c Chan[T]) PadLeft(val T, n int) Chan[T] {
 
 	return output
 }
+
+// Tee passes each main channel value to the passed function.
+// The function is called once for each value.
+func (c Chan[T]) Tee(f func(val T)) Chan[T] {
+	output := make(Chan[T])
+
+	go func() {
+		defer close(output)
+		for val := range c {
+			f(val)
+			output <- val
+		}
+	}()
+
+	return output
+}
