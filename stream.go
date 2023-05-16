@@ -302,3 +302,53 @@ func (c Chan[T]) Zip(b Chan[T], args ...Chan[T]) ChanChan[T] {
 
 	return output
 }
+
+// PadRight adds values to the end of the main channel if that channel's values
+// are fewer than the passed padding amount.
+func (c Chan[T]) PadRight(val T, n int) Chan[T] {
+	output := make(Chan[T])
+
+	go func() {
+		defer close(output)
+		i := 0
+		for val := range c {
+			output <- val
+			i++
+		}
+		if i < n {
+			for val := range Repeat(val).Take(n - i) {
+				output <- val
+			}
+		}
+	}()
+
+	return output
+}
+
+// PadLeft adds values to the beginning of the main channel if that channel's values
+// are fewer than the passed padding amount.
+func (c Chan[T]) PadLeft(val T, n int) Chan[T] {
+	output := make(Chan[T], n)
+
+	for val := range Repeat(val).Take(n) {
+		output <- val
+	}
+
+	for i := 0; i < n; i++ {
+		val, ok := <-c
+		if !ok {
+			break
+		}
+		<-output
+		output <- val
+	}
+
+	go func() {
+		defer close(output)
+		for val := range c {
+			output <- val
+		}
+	}()
+
+	return output
+}

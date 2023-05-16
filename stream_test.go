@@ -224,3 +224,31 @@ func TestZipVariadic3(t *testing.T) {
 		i++
 	}
 }
+
+func TestPadRight(t *testing.T) {
+	expected := []int{1, 2, 3, 4, 5, 0, 0, 0}
+	actual := Iota(1, 6, 1).PadRight(0, 8).Slice()
+
+	assert.Equal(t, expected, actual)
+}
+
+func TestPadRightExceeded(t *testing.T) {
+	expected := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
+	actual := Iota(1, 10, 1).PadRight(0, 8).Slice()
+
+	assert.Equal(t, expected, actual)
+}
+
+func TestPadLeft(t *testing.T) {
+	expected := []int{0, 0, 0, 1, 2, 3, 4, 5}
+	actual := Iota(1, 6, 1).PadLeft(0, 8).Slice()
+
+	assert.Equal(t, expected, actual)
+}
+
+func TestPadLeftExceeded(t *testing.T) {
+	expected := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
+	actual := Iota(1, 10, 1).PadLeft(0, 8).Slice()
+
+	assert.Equal(t, expected, actual)
+}
