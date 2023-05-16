@@ -8,7 +8,7 @@ import (
 )
 
 func TestDrain(t *testing.T) {
-	c := FromString("Lorem ipsum dolor sit amet")
+	c := FromRunes("Lorem ipsum dolor sit amet")
 
 	assert.Equal(t, 'L', <-c)
 	assert.Equal(t, 'o', <-c)
@@ -41,7 +41,7 @@ func TestWriteToString(t *testing.T) {
 	expected := []byte{76, 0, 0, 0, 111, 0, 0, 0}
 
 	buf := new(bytes.Buffer)
-	err := FromString("Lorem ipsum dolor sit amet").Take(2).WriteTo(buf)
+	err := FromRunes("Lorem ipsum dolor sit amet").Take(2).WriteTo(buf)
 	assert.NoError(t, err)
 
 	actual := buf.Bytes()
@@ -58,7 +58,7 @@ func TestString(t *testing.T) {
 
 func TestStringRunes(t *testing.T) {
 	expected := "Lorem ipsum"
-	actual := FromString("Lorem ipsum dolor sit amet").Take(11).String()
+	actual := FromRunes("Lorem ipsum dolor sit amet").Take(11).String()
 
 	assert.Equal(t, expected, actual)
 }

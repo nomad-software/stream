@@ -43,8 +43,15 @@ func TestRepeat(t *testing.T) {
 }
 
 func TestFromString(t *testing.T) {
+	expected := []string{"Lorem", "ipsum"}
+	actual := FromString("Lorem ipsum dolor sit amet", " ").Take(2).Slice()
+
+	assert.Equal(t, expected, actual)
+}
+
+func TestFromRunes(t *testing.T) {
 	expected := []rune{'L', 'o', 'r', 'e', 'm', ' ', 'i', 'p', 's', 'u'}
-	actual := FromString("Lorem ipsum dolor sit amet").Take(10).Slice()
+	actual := FromRunes("Lorem ipsum dolor sit amet").Take(10).Slice()
 
 	assert.Equal(t, expected, actual)
 }

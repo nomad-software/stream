@@ -13,7 +13,7 @@ func TestTake(t *testing.T) {
 	assert.Equal(t, expected, actual)
 
 	empty := []rune{}
-	c := FromString("")
+	c := FromRunes("")
 
 	assert.Equal(t, empty, c.Slice())
 	assert.Equal(t, empty, c.Slice())
@@ -43,7 +43,7 @@ func TestUntilNotEnough(t *testing.T) {
 
 func TestMap(t *testing.T) {
 	expected := "Yberz vcfhz qbybe fvg nzrg"
-	actual := FromString("Lorem ipsum dolor sit amet").Map(func(val rune) rune {
+	actual := FromRunes("Lorem ipsum dolor sit amet").Map(func(val rune) rune {
 		if (val >= 'A' && val <= 'M') || (val >= 'a' && val <= 'm') {
 			return val + 13
 		} else if (val >= 'N' && val <= 'Z') || (val >= 'n' && val <= 'z') {
@@ -80,9 +80,9 @@ func TestLast(t *testing.T) {
 func TestChainVariadic(t *testing.T) {
 	expected := "Lorem ipsum dolor sit amet"
 
-	a := FromString("Lorem ipsum")
-	b := FromString(" dolor")
-	c := FromString(" sit amet")
+	a := FromRunes("Lorem ipsum")
+	b := FromRunes(" dolor")
+	c := FromRunes(" sit amet")
 	actual := a.Chain(b, c).String()
 
 	assert.Equal(t, expected, actual)
@@ -91,9 +91,9 @@ func TestChainVariadic(t *testing.T) {
 func TestChain(t *testing.T) {
 	expected := "Lorem ipsum dolor sit amet"
 
-	a := FromString("Lorem ipsum")
-	b := FromString(" dolor")
-	c := FromString(" sit amet")
+	a := FromRunes("Lorem ipsum")
+	b := FromRunes(" dolor")
+	c := FromRunes(" sit amet")
 	actual := a.Chain(b).Chain(c).String()
 
 	assert.Equal(t, expected, actual)
@@ -102,9 +102,9 @@ func TestChain(t *testing.T) {
 func TestRoundRobinVariadic1(t *testing.T) {
 	expected := "0aA1bB2cC3dD4eE5fF6gG7hH8I9JKLMNOPQRSTUVWXYZ"
 
-	a := FromString("0123456789")
-	b := FromString("abcdefgh")
-	c := FromString("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	a := FromRunes("0123456789")
+	b := FromRunes("abcdefgh")
+	c := FromRunes("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	actual := a.RoundRobin(b, c).String()
 
 	assert.Equal(t, expected, actual)
@@ -113,9 +113,9 @@ func TestRoundRobinVariadic1(t *testing.T) {
 func TestRoundRobinVariadic2(t *testing.T) {
 	expected := "0aA1bB2cC3dD4eE5f6g7h89"
 
-	a := FromString("0123456789")
-	b := FromString("abcdefgh")
-	c := FromString("ABCDE")
+	a := FromRunes("0123456789")
+	b := FromRunes("abcdefgh")
+	c := FromRunes("ABCDE")
 	actual := a.RoundRobin(b, c).String()
 
 	assert.Equal(t, expected, actual)
@@ -124,9 +124,9 @@ func TestRoundRobinVariadic2(t *testing.T) {
 func TestRoundRobin(t *testing.T) {
 	expected := "0AaB1CbD2EcF3GdH4IeJ5KfL6MgN7OhP8QiR9SjTkUlVmWnXoYpZqrstuvwxyz"
 
-	a := FromString("0123456789")
-	b := FromString("abcdefghijklmnopqrstuvwxyz")
-	c := FromString("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	a := FromRunes("0123456789")
+	b := FromRunes("abcdefghijklmnopqrstuvwxyz")
+	c := FromRunes("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	actual := a.RoundRobin(b).RoundRobin(c).String()
 
 	assert.Equal(t, expected, actual)
@@ -178,9 +178,9 @@ func TestZipVariadic1(t *testing.T) {
 		{'2', 'c', 'C'},
 		{'3', 'd', 'D'},
 	}
-	a := FromString("0123") // Stops the zip
-	b := FromString("abcdefg")
-	c := FromString("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	a := FromRunes("0123") // Stops the zip
+	b := FromRunes("abcdefg")
+	c := FromRunes("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	i := 0
 	for c := range a.Zip(b, c) {
 		actual := c.Slice()
@@ -196,9 +196,9 @@ func TestZipVariadic2(t *testing.T) {
 		{'2', 'c', 'C'},
 		{'3', 'd', 'D'},
 	}
-	a := FromString("0123456789")
-	b := FromString("abcd") // Stops the zip
-	c := FromString("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	a := FromRunes("0123456789")
+	b := FromRunes("abcd") // Stops the zip
+	c := FromRunes("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	i := 0
 	for c := range a.Zip(b, c) {
 		actual := c.Slice()
@@ -214,9 +214,9 @@ func TestZipVariadic3(t *testing.T) {
 		{'2', 'c', 'C'},
 		{'3', 'd', 'D'},
 	}
-	a := FromString("0123456789")
-	b := FromString("abcdefghi")
-	c := FromString("ABCD") // Stops the zip
+	a := FromRunes("0123456789")
+	b := FromRunes("abcdefghi")
+	c := FromRunes("ABCD") // Stops the zip
 	i := 0
 	for c := range a.Zip(b, c) {
 		actual := c.Slice()

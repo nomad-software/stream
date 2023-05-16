@@ -3,6 +3,7 @@ package stream
 import (
 	"math"
 	"math/rand"
+	"strings"
 )
 
 // FromSlice creates a channel that will return the items in the passed slice.
@@ -66,14 +67,28 @@ func Repeat[T comparable](val T) Chan[T] {
 	return output
 }
 
-// FromString create a channel that will return the runes in the string.
-func FromString(str string) Chan[rune] {
+// FromString creates a channel that will return strings delimited by a separator.
+func FromString(str string, sep string) Chan[string] {
+	output := make(Chan[string])
+
+	go func() {
+		defer close(output)
+		for val := range FromSlice(strings.Split(str, sep)) {
+			output <- val
+		}
+	}()
+
+	return output
+}
+
+// FromRunes creates a channel that will return the runes in the string.
+func FromRunes(str string) Chan[rune] {
 	output := make(Chan[rune])
 
 	go func() {
 		defer close(output)
-		for _, s := range str {
-			output <- s
+		for _, r := range str {
+			output <- r
 		}
 	}()
 
