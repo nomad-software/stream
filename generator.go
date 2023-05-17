@@ -67,6 +67,20 @@ func Repeat[T comparable](val T) Chan[T] {
 	return output
 }
 
+// FromChannel creates a channel that will return the values of the passed channel.
+func FromChannel[T comparable](c <-chan T) Chan[T] {
+	output := make(Chan[T])
+
+	go func() {
+		defer close(output)
+		for val := range c {
+			output <- val
+		}
+	}()
+
+	return output
+}
+
 // FromString creates a channel that will return strings delimited by a separator.
 func FromString(str string, sep string) Chan[string] {
 	output := make(Chan[string])
@@ -121,7 +135,7 @@ func Fibonacci() Chan[uint] {
 		var a uint = 0
 		var b uint = 1
 		for {
-			if a > math.MaxInt64-b {
+			if a > math.MaxUint-b {
 				return
 			}
 			a = (a + b)
@@ -133,7 +147,38 @@ func Fibonacci() Chan[uint] {
 	return output
 }
 
+// Primes creates an integer channel returning prime numbers.
+// The channel will close when the sequence exceeds the returned channel's
+// type limits.
+func Primes() Chan[int] {
+	output := make(Chan[int])
+
+	go func() {
+		output <- 2
+		primes := make([]int, 0)
+		for n := 3; n > 0; n += 2 {
+			isPrime := true
+			for _, prime := range primes {
+				if n%prime == 0 {
+					isPrime = false
+					break
+				}
+			}
+			if isPrime {
+				if n < 0 {
+					return
+				}
+				output <- n
+				primes = append(primes, n)
+			}
+		}
+	}()
+
+	return output
+}
+
 // RandInt creates an integer channel returning random integers.
+// This channel will not close by itself and should be limited using other methods.
 func RandInt() Chan[int] {
 	output := make(Chan[int])
 
@@ -148,6 +193,7 @@ func RandInt() Chan[int] {
 }
 
 // RandFloat32 creates a (32bit) float channel returning random floats.
+// This channel will not close by itself and should be limited using other methods.
 func RandFloat32() Chan[float64] {
 	output := make(Chan[float64])
 
@@ -162,6 +208,7 @@ func RandFloat32() Chan[float64] {
 }
 
 // RandFloat64 creates a (64bit) float channel returning random floats.
+// This channel will not close by itself and should be limited using other methods.
 func RandFloat64() Chan[float64] {
 	output := make(Chan[float64])
 

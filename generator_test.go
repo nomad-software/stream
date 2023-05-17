@@ -42,6 +42,21 @@ func TestRepeat(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestFromChannel(t *testing.T) {
+	c := make(chan int)
+	go func() {
+		defer close(c)
+		for i := 0; i < 10; i++ {
+			c <- i
+		}
+	}()
+
+	expected := []int{0, 1, 2, 3, 4}
+	actual := FromChannel(c).Take(5).Slice()
+
+	assert.Equal(t, expected, actual)
+}
+
 func TestFromString(t *testing.T) {
 	expected := []string{"Lorem", "ipsum"}
 	actual := FromString("Lorem ipsum dolor sit amet", " ").Take(2).Slice()
@@ -71,8 +86,15 @@ func TestFibonacci(t *testing.T) {
 }
 
 func TestFibonacciMaximum(t *testing.T) {
-	expected := uint(7540113804746346429)
+	expected := uint(12200160415121876738)
+
 	actual := Fibonacci().Last().Pop()
+	assert.Equal(t, expected, actual)
+}
+
+func TestPrimes(t *testing.T) {
+	expected := []int{2, 3, 5, 7, 11, 13, 17, 19, 23, 29}
+	actual := Primes().Take(10).Slice()
 
 	assert.Equal(t, expected, actual)
 }
