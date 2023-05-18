@@ -5,7 +5,7 @@ import (
 )
 
 func ExampleChan() {
-	text := "lorem adipiscing elit ipsum sed neque dolor non libero sit consequat magna amet placerat bibendum"
+	text := "Lorem adipiscing elit ipsum sed neque dolor non libero sit consequat magna amet placerat bibendum"
 
 	output := FromString(text, " ").
 		Stride(3).
@@ -16,5 +16,5 @@ func ExampleChan() {
 		Pop()
 
 	fmt.Println(output)
-	// Output: lorem ipsum
+	// Output: Lorem ipsum
 }
