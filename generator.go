@@ -1,7 +1,7 @@
 package stream
 
 import (
-	"math"
+	"math/big"
 	"math/rand"
 	"strings"
 )
@@ -125,21 +125,16 @@ func Iota(start, end, step int) Chan[int] {
 }
 
 // Fibonacci creates an integer channel returning the fibonacci sequence.
-// The channel will close when the sequence exceeds the returned channel's
-// type limits.
-func Fibonacci() Chan[uint] {
-	output := make(Chan[uint])
+// This channel will not close by itself and should be limited using other methods.
+func Fibonacci() Chan[*big.Int] {
+	output := make(Chan[*big.Int])
 
 	go func() {
 		defer close(output)
-		var a uint = 0
-		var b uint = 1
+		a := big.NewInt(0)
+		b := big.NewInt(1)
 		for {
-			if a > math.MaxUint-b {
-				return
-			}
-			a = (a + b)
-			output <- a
+			output <- big.NewInt(0).Set(a.Add(a, b))
 			a, b = b, a
 		}
 	}()
@@ -149,7 +144,7 @@ func Fibonacci() Chan[uint] {
 
 // Primes creates an integer channel returning prime numbers.
 // The channel will close when the sequence exceeds the returned channel's
-// type limits.
+// type limits which may take a long time.
 func Primes() Chan[int] {
 	output := make(Chan[int])
 

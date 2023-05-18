@@ -1,6 +1,7 @@
 package stream
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,11 +18,11 @@ func TestEuler1(t *testing.T) {
 }
 
 func TestEuler2(t *testing.T) {
-	expected := uint(4613732)
+	expected := big.NewInt(4613732)
 	actual := Fibonacci().
-		Until(func(n uint) bool { return n > 4000000 }).
-		Filter(func(n uint) bool { return n%2 == 0 }).
-		Reduce(func(a, b uint) uint { return a + b }).
+		Until(func(n *big.Int) bool { return n.Cmp(big.NewInt(4000000)) > 0 }).
+		Filter(func(n *big.Int) bool { return big.NewInt(0).Mod(n, big.NewInt(2)).Cmp(big.NewInt(0)) == 0 }).
+		Reduce(func(a, b *big.Int) *big.Int { return big.NewInt(0).Set(a.Add(a, b)) }).
 		Pop()
 
 	assert.Equal(t, expected, actual)
