@@ -91,7 +91,8 @@ func (c Chan[T]) Reduce(f func(a, b T) T) Chan[T] {
 
 	go func() {
 		defer close(output)
-		var a T
+
+		var a T = <-c
 		for val := range c {
 			a = f(a, val)
 		}
@@ -107,7 +108,7 @@ func (c Chan[T]) Last() Chan[T] {
 
 	go func() {
 		defer close(output)
-		var last T
+		var last T = <-c
 		for val := range c {
 			last = val
 		}
