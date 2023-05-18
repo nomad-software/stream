@@ -19,7 +19,7 @@ func TestDrain(t *testing.T) {
 	assert.Equal(t, int32(0), <-c)
 }
 
-func ExampleDrain() {
+func ExampleChan_Drain() {
 	c := FromRunes("Lorem ipsum dolor sit amet")
 
 	c.Drain()
@@ -35,7 +35,7 @@ func TestSlice(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-func ExampleSlice() {
+func ExampleChan_Slice() {
 	result := Iota(1, 5, 1).Slice()
 
 	fmt.Println(result)
@@ -66,7 +66,7 @@ func TestWriteToString(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-func ExampleWriteTo() {
+func ExampleChan_WriteTo() {
 	buf := new(bytes.Buffer)
 	FromRunes("Lorem ipsum dolor sit amet").Take(2).WriteTo(buf)
 
@@ -81,7 +81,7 @@ func TestString(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-func ExampleString() {
+func ExampleChan_String() {
 	result := Iota(1, 10, 1).String()
 
 	fmt.Println(result)
@@ -102,7 +102,7 @@ func TestPop(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-func ExamplePop() {
+func ExampleChan_Pop() {
 	result := Iota(2, 20, 2).Drop(6).Pop()
 
 	fmt.Println(result)
@@ -113,7 +113,7 @@ func TestPrint(t *testing.T) {
 	Iota(2, 10, 2).Print()
 }
 
-func ExamplePrint() {
+func ExampleChan_Print() {
 	Primes().Take(10).Print()
 	// Output: [2 3 5 7 11 13 17 19 23 29]
 }
