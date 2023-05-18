@@ -8,9 +8,9 @@ import (
 
 func TestTake(t *testing.T) {
 	expected := []int{1, 2, 3, 4, 5}
-	actual := Iota(1, 10, 1).Take(5).Slice()
+	result := Iota(1, 10, 1).Take(5).Slice()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 
 	empty := []rune{}
 	c := FromRunes("")
@@ -22,28 +22,28 @@ func TestTake(t *testing.T) {
 
 func TestTakeNotEnough(t *testing.T) {
 	expected := []int{1, 2}
-	actual := Iota(1, 3, 1).Take(5).Slice()
+	result := Iota(1, 3, 1).Take(5).Slice()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 }
 
 func TestUntil(t *testing.T) {
 	expected := []int{1, 2, 3, 4, 5}
-	actual := Iota(1, 10, 1).Until(func(val int) bool { return val > 5 }).Slice()
+	result := Iota(1, 10, 1).Until(func(val int) bool { return val > 5 }).Slice()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 }
 
 func TestUntilNotEnough(t *testing.T) {
 	expected := []int{1, 2}
-	actual := Iota(1, 3, 1).Until(func(val int) bool { return val > 5 }).Slice()
+	result := Iota(1, 3, 1).Until(func(val int) bool { return val > 5 }).Slice()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 }
 
 func TestMap(t *testing.T) {
 	expected := "Yberz vcfhz qbybe fvg nzrg"
-	actual := FromRunes("Lorem ipsum dolor sit amet").Map(func(val rune) rune {
+	result := FromRunes("Lorem ipsum dolor sit amet").Map(func(val rune) rune {
 		if (val >= 'A' && val <= 'M') || (val >= 'a' && val <= 'm') {
 			return val + 13
 		} else if (val >= 'N' && val <= 'Z') || (val >= 'n' && val <= 'z') {
@@ -53,28 +53,28 @@ func TestMap(t *testing.T) {
 		}
 	}).String()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 }
 
 func TestFilter(t *testing.T) {
 	expected := []int{2, 4, 6, 8, 10}
-	actual := Iota(1, 12, 1).Filter(func(val int) bool { return val%2 == 0 }).Slice()
+	result := Iota(1, 12, 1).Filter(func(val int) bool { return val%2 == 0 }).Slice()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 }
 
 func TestReduce(t *testing.T) {
 	expected := 45
-	actual := Iota(1, 10, 1).Reduce(func(a, b int) int { return a + b }).Pop()
+	result := Iota(1, 10, 1).Reduce(func(a, b int) int { return a + b }).Pop()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 }
 
 func TestLast(t *testing.T) {
 	expected := 9
-	actual := Iota(1, 10, 1).Last().Pop()
+	result := Iota(1, 10, 1).Last().Pop()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 }
 
 func TestChainVariadic(t *testing.T) {
@@ -83,9 +83,9 @@ func TestChainVariadic(t *testing.T) {
 	a := FromRunes("Lorem ipsum")
 	b := FromRunes(" dolor")
 	c := FromRunes(" sit amet")
-	actual := a.Chain(b, c).String()
+	result := a.Chain(b, c).String()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 }
 
 func TestChain(t *testing.T) {
@@ -94,9 +94,9 @@ func TestChain(t *testing.T) {
 	a := FromRunes("Lorem ipsum")
 	b := FromRunes(" dolor")
 	c := FromRunes(" sit amet")
-	actual := a.Chain(b).Chain(c).String()
+	result := a.Chain(b).Chain(c).String()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 }
 
 func TestRoundRobinVariadic1(t *testing.T) {
@@ -105,9 +105,9 @@ func TestRoundRobinVariadic1(t *testing.T) {
 	a := FromRunes("0123456789")
 	b := FromRunes("abcdefgh")
 	c := FromRunes("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	actual := a.RoundRobin(b, c).String()
+	result := a.RoundRobin(b, c).String()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 }
 
 func TestRoundRobinVariadic2(t *testing.T) {
@@ -116,9 +116,9 @@ func TestRoundRobinVariadic2(t *testing.T) {
 	a := FromRunes("0123456789")
 	b := FromRunes("abcdefgh")
 	c := FromRunes("ABCDE")
-	actual := a.RoundRobin(b, c).String()
+	result := a.RoundRobin(b, c).String()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 }
 
 func TestRoundRobin(t *testing.T) {
@@ -127,26 +127,26 @@ func TestRoundRobin(t *testing.T) {
 	a := FromRunes("0123456789")
 	b := FromRunes("abcdefghijklmnopqrstuvwxyz")
 	c := FromRunes("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	actual := a.RoundRobin(b).RoundRobin(c).String()
+	result := a.RoundRobin(b).RoundRobin(c).String()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 }
 
 func TestChunk(t *testing.T) {
 	expected := [][]int{{2, 4}, {6, 8}, {10}}
 	i := 0
 	for c := range Iota(2, 12, 2).Chunk(2) {
-		actual := c.Slice()
-		assert.Equal(t, expected[i], actual)
+		result := c.Slice()
+		assert.Equal(t, expected[i], result)
 		i++
 	}
 }
 
 func TestDrop(t *testing.T) {
 	expected := []int{6, 7, 8, 9, 10}
-	actual := Iota(1, 20, 1).Drop(5).Take(5).Slice()
+	result := Iota(1, 20, 1).Drop(5).Take(5).Slice()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 
 	expected = []int{6, 7, 8}
 	empty := []int{}
@@ -159,16 +159,16 @@ func TestDrop(t *testing.T) {
 
 func TestStride(t *testing.T) {
 	expected := []int{1, 4, 7, 10, 13, 16, 19, 22, 25, 28}
-	actual := Iota(1, 100, 1).Stride(3).Take(10).Slice()
+	result := Iota(1, 100, 1).Stride(3).Take(10).Slice()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 }
 
 func TestTail(t *testing.T) {
 	expected := []int{17, 18, 19}
-	actual := Iota(1, 20, 1).Tail(3).Slice()
+	result := Iota(1, 20, 1).Tail(3).Slice()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 }
 
 func TestZipVariadic1(t *testing.T) {
@@ -183,8 +183,8 @@ func TestZipVariadic1(t *testing.T) {
 	c := FromRunes("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	i := 0
 	for c := range a.Zip(b, c) {
-		actual := c.Slice()
-		assert.Equal(t, expected[i], actual)
+		result := c.Slice()
+		assert.Equal(t, expected[i], result)
 		i++
 	}
 }
@@ -201,8 +201,8 @@ func TestZipVariadic2(t *testing.T) {
 	c := FromRunes("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	i := 0
 	for c := range a.Zip(b, c) {
-		actual := c.Slice()
-		assert.Equal(t, expected[i], actual)
+		result := c.Slice()
+		assert.Equal(t, expected[i], result)
 		i++
 	}
 }
@@ -219,45 +219,45 @@ func TestZipVariadic3(t *testing.T) {
 	c := FromRunes("ABCD") // Stops the zip
 	i := 0
 	for c := range a.Zip(b, c) {
-		actual := c.Slice()
-		assert.Equal(t, expected[i], actual)
+		result := c.Slice()
+		assert.Equal(t, expected[i], result)
 		i++
 	}
 }
 
 func TestPadRight(t *testing.T) {
 	expected := []int{1, 2, 3, 4, 5, 0, 0, 0}
-	actual := Iota(1, 6, 1).PadRight(0, 8).Slice()
+	result := Iota(1, 6, 1).PadRight(0, 8).Slice()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 }
 
 func TestPadRightExceeded(t *testing.T) {
 	expected := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
-	actual := Iota(1, 10, 1).PadRight(0, 8).Slice()
+	result := Iota(1, 10, 1).PadRight(0, 8).Slice()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 }
 
 func TestPadLeft(t *testing.T) {
 	expected := []int{0, 0, 0, 1, 2, 3, 4, 5}
-	actual := Iota(1, 6, 1).PadLeft(0, 8).Slice()
+	result := Iota(1, 6, 1).PadLeft(0, 8).Slice()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 }
 
 func TestPadLeftExceeded(t *testing.T) {
 	expected := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
-	actual := Iota(1, 10, 1).PadLeft(0, 8).Slice()
+	result := Iota(1, 10, 1).PadLeft(0, 8).Slice()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 }
 
 func TestTee(t *testing.T) {
 	expected := []int{1, 2, 3, 4, 5}
 	tee := 0
-	actual := Iota(1, 6, 1).Tee(func(val int) { tee = val }).Slice()
+	result := Iota(1, 6, 1).Tee(func(val int) { tee = val }).Slice()
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, expected, result)
 	assert.Equal(t, 5, tee)
 }

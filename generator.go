@@ -197,13 +197,13 @@ func RandInt() Chan[int] {
 
 // RandFloat32 creates a (32bit) float channel returning random floats. This
 // channel will not close by itself and should be limited using other methods.
-func RandFloat32() Chan[float64] {
-	output := make(Chan[float64])
+func RandFloat32() Chan[float32] {
+	output := make(Chan[float32])
 
 	go func() {
 		defer close(output)
 		for {
-			output <- rand.Float64()
+			output <- rand.Float32()
 		}
 	}()
 
