@@ -1,6 +1,7 @@
 package stream
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,6 +21,13 @@ func TestTake(t *testing.T) {
 	assert.Equal(t, empty, c.Slice())
 }
 
+func ExampleChan_Take() {
+	result := Iota(1, 10, 1).Take(5).Slice()
+
+	fmt.Println(result)
+	// Output: [1 2 3 4 5]
+}
+
 func TestTakeNotEnough(t *testing.T) {
 	expected := []int{1, 2}
 	result := Iota(1, 3, 1).Take(5).Slice()
@@ -32,6 +40,15 @@ func TestUntil(t *testing.T) {
 	result := Iota(1, 10, 1).Until(func(val int) bool { return val > 5 }).Slice()
 
 	assert.Equal(t, expected, result)
+}
+
+func ExampleChan_Until() {
+	result := Iota(1, 1000, 1).Until(func(val int) bool {
+		return val > 5
+	}).Slice()
+
+	fmt.Println(result)
+	// Output: [1 2 3 4 5]
 }
 
 func TestUntilNotEnough(t *testing.T) {
@@ -56,11 +73,39 @@ func TestMap(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
+func ExampleChan_Map() {
+	rot13 := func(val rune) rune {
+		if (val >= 'A' && val <= 'M') || (val >= 'a' && val <= 'm') {
+			return val + 13
+		} else if (val >= 'N' && val <= 'Z') || (val >= 'n' && val <= 'z') {
+			return val - 13
+		} else {
+			return val
+		}
+	}
+
+	result := FromRunes("Lorem ipsum dolor sit amet").Map(rot13).String()
+
+	fmt.Println(result)
+	// Output: Yberz vcfhz qbybe fvg nzrg
+}
+
 func TestFilter(t *testing.T) {
 	expected := []int{2, 4, 6, 8, 10}
 	result := Iota(1, 12, 1).Filter(func(val int) bool { return val%2 == 0 }).Slice()
 
 	assert.Equal(t, expected, result)
+}
+
+func ExampleChan_Filter() {
+	even := func(val int) bool {
+		return val%2 == 0
+	}
+
+	result := Iota(1, 12, 1).Filter(even).Slice()
+
+	fmt.Println(result)
+	// Output: [2 4 6 8 10]
 }
 
 func TestReduce(t *testing.T) {
@@ -70,11 +115,29 @@ func TestReduce(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
+func ExampleChan_Reduce() {
+	sum := func(a, b int) int {
+		return a + b
+	}
+
+	result := Iota(1, 10, 1).Reduce(sum).Pop()
+
+	fmt.Println(result)
+	// Output: 45
+}
+
 func TestLast(t *testing.T) {
 	expected := 9
 	result := Iota(1, 10, 1).Last().Pop()
 
 	assert.Equal(t, expected, result)
+}
+
+func ExampleChan_Last() {
+	result := Iota(1, 10, 1).Last().Pop()
+
+	fmt.Println(result)
+	// Output: 9
 }
 
 func TestChainVariadic(t *testing.T) {
@@ -86,6 +149,17 @@ func TestChainVariadic(t *testing.T) {
 	result := a.Chain(b, c).String()
 
 	assert.Equal(t, expected, result)
+}
+
+func ExampleChan_Chain() {
+	a := FromRunes("Lorem ipsum")
+	b := FromRunes(" dolor")
+	c := FromRunes(" sit amet")
+
+	result := a.Chain(b, c).String()
+
+	fmt.Println(result)
+	// Output: Lorem ipsum dolor sit amet
 }
 
 func TestChain(t *testing.T) {
@@ -108,6 +182,17 @@ func TestRoundRobinVariadic1(t *testing.T) {
 	result := a.RoundRobin(b, c).String()
 
 	assert.Equal(t, expected, result)
+}
+
+func ExampleChan_RoundRobin() {
+	a := FromRunes("0123456789")
+	b := FromRunes("abcdefgh")
+	c := FromRunes("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+	result := a.RoundRobin(b, c).String()
+
+	fmt.Println(result)
+	// Output: 0aA1bB2cC3dD4eE5fF6gG7hH8I9JKLMNOPQRSTUVWXYZ
 }
 
 func TestRoundRobinVariadic2(t *testing.T) {
@@ -142,6 +227,18 @@ func TestChunk(t *testing.T) {
 	}
 }
 
+func ExampleChan_Chunk() {
+	for c := range Iota(2, 20, 2).Chunk(4) {
+		result := c.Slice()
+		fmt.Println(result)
+	}
+
+	// Output:
+	// [2 4 6 8]
+	// [10 12 14 16]
+	// [18]
+}
+
 func TestDrop(t *testing.T) {
 	expected := []int{6, 7, 8, 9, 10}
 	result := Iota(1, 20, 1).Drop(5).Take(5).Slice()
@@ -157,6 +254,13 @@ func TestDrop(t *testing.T) {
 	assert.Equal(t, empty, c.Drop(5).Slice())
 }
 
+func ExampleChan_Drop() {
+	result := Iota(1, 20, 1).Drop(5).Take(5).Slice()
+
+	fmt.Println(result)
+	// Output: [6 7 8 9 10]
+}
+
 func TestStride(t *testing.T) {
 	expected := []int{1, 4, 7, 10, 13, 16, 19, 22, 25, 28}
 	result := Iota(1, 100, 1).Stride(3).Take(10).Slice()
@@ -164,11 +268,25 @@ func TestStride(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
+func ExampleChan_Stride() {
+	result := Iota(1, 100, 1).Stride(3).Take(10).Slice()
+
+	fmt.Println(result)
+	// Output: [1 4 7 10 13 16 19 22 25 28]
+}
+
 func TestTail(t *testing.T) {
 	expected := []int{17, 18, 19}
 	result := Iota(1, 20, 1).Tail(3).Slice()
 
 	assert.Equal(t, expected, result)
+}
+
+func ExampleChan_Tail() {
+	result := Iota(1, 20, 1).Tail(3).Slice()
+
+	fmt.Println(result)
+	// Output: [17 18 19]
 }
 
 func TestZipVariadic1(t *testing.T) {
@@ -187,6 +305,23 @@ func TestZipVariadic1(t *testing.T) {
 		assert.Equal(t, expected[i], result)
 		i++
 	}
+}
+
+func ExampleChan_Zip() {
+	a := FromRunes("0123")
+	b := FromRunes("abcdefg")
+	c := FromRunes("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+	for c := range a.Zip(b, c) {
+		result := c.Slice()
+		fmt.Println(result)
+	}
+
+	// Output:
+	// [48 97 65]
+	// [49 98 66]
+	// [50 99 67]
+	// [51 100 68]
 }
 
 func TestZipVariadic2(t *testing.T) {
@@ -232,6 +367,13 @@ func TestPadRight(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
+func ExampleChan_PadRight() {
+	result := Iota(1, 6, 1).PadRight(0, 8).Slice()
+
+	fmt.Println(result)
+	// Output: [1 2 3 4 5 0 0 0]
+}
+
 func TestPadRightExceeded(t *testing.T) {
 	expected := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
 	result := Iota(1, 10, 1).PadRight(0, 8).Slice()
@@ -244,6 +386,13 @@ func TestPadLeft(t *testing.T) {
 	result := Iota(1, 6, 1).PadLeft(0, 8).Slice()
 
 	assert.Equal(t, expected, result)
+}
+
+func ExampleChan_PadLeft() {
+	result := Iota(1, 6, 1).PadLeft(0, 8).Slice()
+
+	fmt.Println(result)
+	// Output: [0 0 0 1 2 3 4 5]
 }
 
 func TestPadLeftExceeded(t *testing.T) {
@@ -260,4 +409,19 @@ func TestTee(t *testing.T) {
 
 	assert.Equal(t, expected, result)
 	assert.Equal(t, 5, tee)
+}
+
+func ExampleChan_Tee() {
+	count := 0
+
+	result := Iota(1, 6, 1).Tee(func(val int) {
+		count = val
+	}).Slice()
+
+	fmt.Println(result)
+	fmt.Println(count)
+
+	// Output:
+	// [1 2 3 4 5]
+	// 5
 }
