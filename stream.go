@@ -4,7 +4,7 @@ package stream
 type Chan[T comparable] chan T
 type ChanChan[T comparable] chan Chan[T]
 
-// Take returns only n items from the main channel.
+// Take returns n items from the main channel before closing it.
 func (c Chan[T]) Take(n int) Chan[T] {
 	output := make(Chan[T])
 
@@ -23,7 +23,7 @@ func (c Chan[T]) Take(n int) Chan[T] {
 }
 
 // Until closes a channel when the passed function returns true, otherwise it
-// wll keep returning values. The function is called once for each value.
+// wll keep returning values. The passed function is called once for each value.
 func (c Chan[T]) Until(f func(val T) bool) Chan[T] {
 	output := make(Chan[T])
 
@@ -44,8 +44,8 @@ func (c Chan[T]) Until(f func(val T) bool) Chan[T] {
 	return output
 }
 
-// Map mutates main channel values based on the passed function.
-// The function is called once for each value.
+// Map mutates main channel values based on the passed function. The passed
+// function is called once for each value.
 func (c Chan[T]) Map(f func(val T) T) Chan[T] {
 	output := make(Chan[T])
 
@@ -63,8 +63,8 @@ func (c Chan[T]) Map(f func(val T) T) Chan[T] {
 	return output
 }
 
-// Filter filters main channel values based on the passed function returning true.
-// The function is called once for each value.
+// Filter filters main channel values based on the passed function returning
+// true. The passed function is called once for each value.
 func (c Chan[T]) Filter(f func(val T) bool) Chan[T] {
 	output := make(Chan[T])
 
@@ -85,7 +85,7 @@ func (c Chan[T]) Filter(f func(val T) bool) Chan[T] {
 }
 
 // Reduce reduces main channel values to one value based on the passed function.
-// The function is called once for each value.
+// The passed function is called once for each value.
 func (c Chan[T]) Reduce(f func(a, b T) T) Chan[T] {
 	output := make(Chan[T])
 
@@ -141,8 +141,8 @@ func (c Chan[T]) Chain(b Chan[T], args ...Chan[T]) Chan[T] {
 	return output
 }
 
-// RoundRobin will take alternate values from the passed channels and the main channel.
-// It will return values until all channels are exhausted.
+// RoundRobin will return alternate values from the main channel and the passed
+// channels, in order.
 func (c Chan[T]) RoundRobin(b Chan[T], args ...Chan[T]) Chan[T] {
 	output := make(Chan[T])
 
@@ -177,8 +177,8 @@ func (c Chan[T]) RoundRobin(b Chan[T], args ...Chan[T]) Chan[T] {
 	return output
 }
 
-// Chunk returns a channel full of channels of the passed length containing
-// separated values of the main channel.
+// Chunk returns a channel full of channels of the passed length, filled with
+// values of the main channel.
 func (c Chan[T]) Chunk(n int) ChanChan[T] {
 	output := make(ChanChan[T])
 
@@ -225,7 +225,8 @@ func (c Chan[T]) Drop(n int) Chan[T] {
 	return output
 }
 
-// Stride steps over channel values returning every n value of the main channel.
+// Stride iterates over channel values returning every n value of the main
+// channel.
 func (c Chan[T]) Stride(n int) Chan[T] {
 	output := make(Chan[T])
 
@@ -244,7 +245,8 @@ func (c Chan[T]) Stride(n int) Chan[T] {
 	return output
 }
 
-// Tail returns a channel of the last n values of the main channel.
+// Tail returns a channel containing the last n values of the main channel once
+// it's closed.
 func (c Chan[T]) Tail(n int) Chan[T] {
 	output := make(Chan[T])
 
@@ -270,7 +272,7 @@ func (c Chan[T]) Tail(n int) Chan[T] {
 }
 
 // Zip returns a channel of channels containing the next values of the main
-// channel and all other passed channels
+// channel and all other passed channels, in order.
 func (c Chan[T]) Zip(b Chan[T], args ...Chan[T]) ChanChan[T] {
 	output := make(ChanChan[T])
 
@@ -305,7 +307,7 @@ func (c Chan[T]) Zip(b Chan[T], args ...Chan[T]) ChanChan[T] {
 }
 
 // PadRight adds values to the end of the main channel if that channel's values
-// are fewer than the passed padding amount.
+// are fewer than the passed padding amount once the channel is closed.
 func (c Chan[T]) PadRight(val T, n int) Chan[T] {
 	output := make(Chan[T])
 
@@ -354,8 +356,8 @@ func (c Chan[T]) PadLeft(val T, n int) Chan[T] {
 	return output
 }
 
-// Tee passes each main channel value to the passed function.
-// The function is called once for each value.
+// Tee passes each main channel value to the passed function. The passed
+// function is called once for each value.
 func (c Chan[T]) Tee(f func(val T)) Chan[T] {
 	output := make(Chan[T])
 

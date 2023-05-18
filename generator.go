@@ -7,6 +7,7 @@ import (
 )
 
 // FromSlice creates a channel that will return the items in the passed slice.
+// The channel will close when the slice values are exhausted.
 func FromSlice[T comparable](slice []T) Chan[T] {
 	output := make(Chan[T])
 
@@ -21,7 +22,8 @@ func FromSlice[T comparable](slice []T) Chan[T] {
 }
 
 // Cycle creates a channel that will repeat the items in the passed slice
-// infinitely.
+// infinitely. This channel will not close by itself and should be limited using
+// other methods.
 func Cycle[T comparable](slice []T) Chan[T] {
 	output := make(Chan[T])
 
@@ -39,7 +41,8 @@ func Cycle[T comparable](slice []T) Chan[T] {
 }
 
 // Generate creates a channel that will return values returned from the passed
-// function.
+// function. This channel will not close by itself and should be limited using
+// other methods.
 func Generate[T comparable](f func() T) Chan[T] {
 	output := make(Chan[T])
 
@@ -53,7 +56,8 @@ func Generate[T comparable](f func() T) Chan[T] {
 	return output
 }
 
-// Repeat creates a channel that will repeat the passed value infinitely.
+// Repeat creates a channel that will repeat the passed value infinitely. This
+// channel will not close by itself and should be limited using other methods.
 func Repeat[T comparable](val T) Chan[T] {
 	output := make(Chan[T])
 
@@ -67,7 +71,8 @@ func Repeat[T comparable](val T) Chan[T] {
 	return output
 }
 
-// FromChannel creates a channel that will return the values of the passed channel.
+// FromChannel creates a channel that will return the values of the passed
+// channel. The channel will close when passed channel is closed.
 func FromChannel[T comparable](c <-chan T) Chan[T] {
 	output := make(Chan[T])
 
@@ -81,7 +86,8 @@ func FromChannel[T comparable](c <-chan T) Chan[T] {
 	return output
 }
 
-// FromString creates a channel that will return strings delimited by a separator.
+// FromString creates a channel that will return strings delimited by a
+// separator. The channel will close when the strings are exhausted.
 func FromString(str string, sep string) Chan[string] {
 	output := make(Chan[string])
 
@@ -95,7 +101,8 @@ func FromString(str string, sep string) Chan[string] {
 	return output
 }
 
-// FromRunes creates a channel that will return the runes in the string.
+// FromRunes creates a channel that will return the runes in the string. The
+// channel will close when the runes are exhausted.
 func FromRunes(str string) Chan[rune] {
 	output := make(Chan[rune])
 
@@ -109,8 +116,9 @@ func FromRunes(str string) Chan[rune] {
 	return output
 }
 
-// Iota creates a channel that will return integers based on the supplied arguments.
-// This channel will not close by itself and should be limited using other methods.
+// Iota creates a channel that will return integers based on the supplied
+// arguments. This channel will not close by itself and should be limited using
+// other methods.
 func Iota(start, end, step int) Chan[int] {
 	output := make(Chan[int])
 
@@ -124,8 +132,8 @@ func Iota(start, end, step int) Chan[int] {
 	return output
 }
 
-// Fibonacci creates an integer channel returning the fibonacci sequence.
-// This channel will not close by itself and should be limited using other methods.
+// Fibonacci creates an integer channel returning the fibonacci sequence. This
+// channel will not close by itself and should be limited using other methods.
 func Fibonacci() Chan[*big.Int] {
 	output := make(Chan[*big.Int])
 
@@ -142,9 +150,9 @@ func Fibonacci() Chan[*big.Int] {
 	return output
 }
 
-// Primes creates an integer channel returning prime numbers.
-// The channel will close when the sequence exceeds the returned channel's
-// type limits which may take a long time.
+// Primes creates an integer channel returning prime numbers. The channel will
+// close when the sequence exceeds the returned channel's type limits which may
+// take a long time.
 func Primes() Chan[int] {
 	output := make(Chan[int])
 
@@ -172,8 +180,8 @@ func Primes() Chan[int] {
 	return output
 }
 
-// RandInt creates an integer channel returning random integers.
-// This channel will not close by itself and should be limited using other methods.
+// RandInt creates an integer channel returning random integers. This channel
+// will not close by itself and should be limited using other methods.
 func RandInt() Chan[int] {
 	output := make(Chan[int])
 
@@ -187,8 +195,8 @@ func RandInt() Chan[int] {
 	return output
 }
 
-// RandFloat32 creates a (32bit) float channel returning random floats.
-// This channel will not close by itself and should be limited using other methods.
+// RandFloat32 creates a (32bit) float channel returning random floats. This
+// channel will not close by itself and should be limited using other methods.
 func RandFloat32() Chan[float64] {
 	output := make(Chan[float64])
 
@@ -202,8 +210,8 @@ func RandFloat32() Chan[float64] {
 	return output
 }
 
-// RandFloat64 creates a (64bit) float channel returning random floats.
-// This channel will not close by itself and should be limited using other methods.
+// RandFloat64 creates a (64bit) float channel returning random floats. This
+// channel will not close by itself and should be limited using other methods.
 func RandFloat64() Chan[float64] {
 	output := make(Chan[float64])
 

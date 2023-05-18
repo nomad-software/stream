@@ -7,13 +7,15 @@ import (
 	"unsafe"
 )
 
-// Drain drains the main channel of all values.
+// Drain drains the main channel of all values and will return once the main
+// channel is closed.
 func (c Chan[T]) Drain() {
 	for range c {
 	}
 }
 
-// Slice returns a slice containing the channel values once the channel closes.
+// Slice returns a slice containing the channel values once the main channel
+// closes.
 func (c Chan[T]) Slice() []T {
 	output := make([]T, 0)
 
@@ -24,7 +26,7 @@ func (c Chan[T]) Slice() []T {
 	return output
 }
 
-// WriteTo writes the channel values as bytes to the writer argument.
+// WriteTo writes the main channel values as bytes to the writer argument.
 func (c Chan[T]) WriteTo(w io.Writer) error {
 	for v := range c {
 		switch val := any(v).(type) {
@@ -73,7 +75,9 @@ func (c Chan[T]) WriteTo(w io.Writer) error {
 	return nil
 }
 
-// String returns the string representation of the channel values as a slice.
+// String returns the string representation of the main channel values as a
+// slice. A specialisation exists for rune channels, returning their string
+// representation instead.
 func (c Chan[T]) String() string {
 	slice := c.Slice()
 
@@ -87,13 +91,13 @@ func (c Chan[T]) String() string {
 
 }
 
-// Pop will return one value from the channel.
+// Pop will return one value from the main channel.
 func (c Chan[T]) Pop() T {
 	return <-c
 }
 
-// Print will print the string representation of the channel values to stdout.
-// This is useful for debugging.
+// Print will output the string representation of the main channel values to
+// stdout. This is useful for debugging.
 func (c Chan[T]) Print() {
 	fmt.Println(c.String())
 }
