@@ -83,6 +83,7 @@ func ExampleRepeat() {
 
 func TestFromChannel(t *testing.T) {
 	c := make(chan int)
+
 	go func() {
 		defer close(c)
 		for i := 0; i < 10; i++ {
@@ -98,6 +99,7 @@ func TestFromChannel(t *testing.T) {
 
 func ExampleFromChannel() {
 	c := make(chan int)
+
 	go func() {
 		defer close(c)
 		for i := 0; i < 10; i++ {

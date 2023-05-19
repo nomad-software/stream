@@ -229,8 +229,7 @@ func TestChunk(t *testing.T) {
 
 func ExampleChan_Chunk() {
 	for c := range Iota(2, 20, 2).Chunk(4) {
-		result := c.Slice()
-		fmt.Println(result)
+		fmt.Println(c.Slice())
 	}
 
 	// Output:
@@ -313,15 +312,14 @@ func ExampleChan_Zip() {
 	c := FromRunes("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 	for c := range a.Zip(b, c) {
-		result := c.Slice()
-		fmt.Println(result)
+		fmt.Println(c.String())
 	}
 
 	// Output:
-	// [48 97 65]
-	// [49 98 66]
-	// [50 99 67]
-	// [51 100 68]
+	// 0aA
+	// 1bB
+	// 2cC
+	// 3dD
 }
 
 func TestZipVariadic2(t *testing.T) {
@@ -415,13 +413,10 @@ func ExampleChan_Tee() {
 	count := 0
 
 	result := Iota(1, 6, 1).Tee(func(val int) {
-		count = val
+		count++
 	}).Slice()
 
-	fmt.Println(result)
-	fmt.Println(count)
+	fmt.Printf("values: %v count: %d\n", result, count)
 
-	// Output:
-	// [1 2 3 4 5]
-	// 5
+	// Output: values: [1 2 3 4 5] count: 5
 }
