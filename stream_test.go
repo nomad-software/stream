@@ -231,7 +231,6 @@ func ExampleChan_Chunk() {
 	for c := range Iota(2, 20, 2).Chunk(4) {
 		fmt.Println(c.Slice())
 	}
-
 	// Output:
 	// [2 4 6 8]
 	// [10 12 14 16]
@@ -314,7 +313,6 @@ func ExampleChan_Zip() {
 	for c := range a.Zip(b, c) {
 		fmt.Println(c.String())
 	}
-
 	// Output:
 	// 0aA
 	// 1bB
@@ -417,6 +415,38 @@ func ExampleChan_Tee() {
 	}).Slice()
 
 	fmt.Printf("values: %v count: %d\n", result, count)
-
 	// Output: values: [1 2 3 4 5] count: 5
+}
+
+func TestEnumerate(t *testing.T) {
+	expected := []Enum[string]{
+		{
+			Index: 1,
+			Val:   "Lorem",
+		},
+		{
+			Index: 2,
+			Val:   "ipsum",
+		},
+	}
+
+	i := 0
+	for val := range FromString("Lorem ipsum dolor sit amet", " ").Take(2).Enumerate(1) {
+		assert.Equal(t, expected[i], val)
+		i++
+	}
+}
+
+func ExampleChan_Enumerate() {
+	text := "Lorem ipsum dolor sit amet"
+
+	for v := range FromString(text, " ").Enumerate(1) {
+		fmt.Printf("%d: %v\n", v.Index, v.Val)
+	}
+	// Output:
+	// 1: Lorem
+	// 2: ipsum
+	// 3: dolor
+	// 4: sit
+	// 5: amet
 }

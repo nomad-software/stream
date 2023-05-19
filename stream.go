@@ -3,6 +3,13 @@ package stream
 // Generic channel types.
 type Chan[T comparable] chan T
 type ChanChan[T comparable] chan Chan[T]
+type ChanEnum[T comparable] chan Enum[T]
+
+// Enum adds an enumeration index to a value.
+type Enum[T comparable] struct {
+	Index int `json:"index"`
+	Val   T   `json:"val"`
+}
 
 // Take returns n items from the main channel before closing it.
 func (c Chan[T]) Take(n int) Chan[T] {
@@ -366,6 +373,25 @@ func (c Chan[T]) Tee(f func(val T)) Chan[T] {
 		for val := range c {
 			f(val)
 			output <- val
+		}
+	}()
+
+	return output
+}
+
+// Enumerate decorates main channel values with an enumerated index starting at
+// the passed n.
+func (c Chan[T]) Enumerate(n int) chan Enum[T] {
+	output := make(chan Enum[T])
+
+	go func() {
+		defer close(output)
+		for val := range c {
+			output <- Enum[T]{
+				Index: n,
+				Val:   val,
+			}
+			n++
 		}
 	}()
 
