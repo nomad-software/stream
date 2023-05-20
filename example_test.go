@@ -1,8 +1,6 @@
 package stream
 
-import (
-	"fmt"
-)
+import "os"
 
 func join(a, b string) string {
 	return a + " " + b
@@ -11,12 +9,11 @@ func join(a, b string) string {
 func Example() {
 	text := "Lorem adipiscing elit ipsum sed neque dolor non libero sit consequat magna amet placerat bibendum"
 
-	result := FromString(text, " ").
+	FromString(text, " ").
 		Stride(3).
 		Take(2).
 		Reduce(join).
-		Pop()
+		WriteTo(os.Stdout)
 
-	fmt.Println(result)
 	// Output: Lorem ipsum
 }
