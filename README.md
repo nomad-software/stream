@@ -6,7 +6,7 @@
 
 ## Description
 
-This is a collection of generic, reusable, channel based stream processors that perform various operations on channels and their values. It's inspired by [component based programming](https://wiki.dlang.org/Component_programming_with_ranges) and [ranges](https://www.informit.com/articles/printerfriendly/1407357) popularised by the [D language](https://dlang.org/). This is kind of an experiment to see how far I can leverage this. I've no idea if this is even useful.
+This is a collection of generic, reusable, channel based stream processors that perform various operations on channels and their values. It's inspired by [component based programming](https://wiki.dlang.org/Component_programming_with_ranges) and [ranges](https://www.informit.com/articles/printerfriendly/1407357) popularised by the [D language](https://dlang.org/). Each operation is designed to be concurrent and if possible will execute in parallel. This is kind of an experiment to see how far I can leverage this. I've no idea if this is even useful.
 
 ## Example
 
