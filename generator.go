@@ -1,6 +1,7 @@
 package stream
 
 import (
+	"io"
 	"math/big"
 	"math/rand"
 	"strings"
@@ -219,6 +220,29 @@ func RandFloat64() Chan[float64] {
 		defer close(output)
 		for {
 			output <- rand.Float64()
+		}
+	}()
+
+	return output
+}
+
+// ReadFrom creates a byte channel returning bytes read from the passed reader.
+// The channel will close when the reader returns an error. This error could be
+// a EOF indicating the data has been exhausted or any other error.
+func ReadFrom(r io.Reader) Chan[byte] {
+	output := make(Chan[byte])
+
+	go func() {
+		defer close(output)
+		buf := make([]byte, 8)
+		for {
+			n, err := r.Read(buf)
+			for i := 0; i < n; i++ {
+				output <- buf[i]
+			}
+			if err != nil {
+				return
+			}
 		}
 	}()
 

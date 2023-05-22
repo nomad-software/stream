@@ -1,6 +1,7 @@
 package stream
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"testing"
@@ -234,4 +235,25 @@ func ExampleRandFloat64() {
 
 	fmt.Println(len(result))
 	// Output: 10
+}
+
+func TestReadFrom(t *testing.T) {
+	expected := "Lorem ipsum"
+
+	data := []byte("Lorem ipsum dolor sit amet")
+	r := bytes.NewReader(data)
+
+	result := ReadFrom(r).Take(11).Slice()
+
+	assert.Equal(t, expected, string(result))
+}
+
+func ExampleReadFrom() {
+	data := []byte("Lorem ipsum dolor sit amet")
+	r := bytes.NewReader(data)
+
+	result := ReadFrom(r).Take(11).Slice()
+
+	fmt.Println(string(result))
+	// Output: Lorem ipsum
 }
