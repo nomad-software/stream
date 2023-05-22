@@ -450,3 +450,17 @@ func ExampleChan_Enumerate() {
 	// 4: sit
 	// 5: amet
 }
+
+func TestFind(t *testing.T) {
+	expected := []string{"dolor", "sit", "amet"}
+	result := FromString("Lorem ipsum dolor sit amet", " ").Find("dolor").Slice()
+
+	assert.Equal(t, expected, result)
+}
+
+func ExampleChan_Find() {
+	result := FromString("Lorem ipsum dolor sit amet", " ").Find("dolor").Slice()
+
+	fmt.Println(result)
+	// Output: [dolor sit amet]
+}

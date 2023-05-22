@@ -397,3 +397,24 @@ func (c Chan[T]) Enumerate(n int) chan Enum[T] {
 
 	return output
 }
+
+// Find drains the main channel until the passed needle value is found then
+// normal iteration continues.
+func (c Chan[T]) Find(needle T) Chan[T] {
+	output := make(Chan[T])
+
+	go func() {
+		defer close(output)
+		for val := range c {
+			if val == needle {
+				output <- val
+				break
+			}
+		}
+		for val := range c {
+			output <- val
+		}
+	}()
+
+	return output
+}
