@@ -418,3 +418,22 @@ func (c Chan[T]) Find(needle T) Chan[T] {
 
 	return output
 }
+
+// Substitute iterates over main channel values replacing the passed old value
+// with the new value.
+func (c Chan[T]) Substitute(old, new T) Chan[T] {
+	output := make(Chan[T])
+
+	go func() {
+		defer close(output)
+		for val := range c {
+			if val == old {
+				output <- new
+				continue
+			}
+			output <- val
+		}
+	}()
+
+	return output
+}

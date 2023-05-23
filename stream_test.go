@@ -464,3 +464,17 @@ func ExampleChan_Find() {
 	fmt.Println(result)
 	// Output: [dolor sit amet]
 }
+
+func TestSubstitute(t *testing.T) {
+	expected := []string{"Lorem", "ipsum", "lectus", "sit", "amet"}
+	result := FromString("Lorem ipsum dolor sit amet", " ").Substitute("dolor", "lectus").Slice()
+
+	assert.Equal(t, expected, result)
+}
+
+func ExampleChan_Substitute() {
+	result := FromString("Lorem ipsum dolor sit amet", " ").Substitute("dolor", "lectus").Slice()
+
+	fmt.Println(result)
+	// Output: [Lorem ipsum lectus sit amet]
+}
