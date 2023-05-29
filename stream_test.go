@@ -478,3 +478,17 @@ func ExampleChan_Substitute() {
 	fmt.Println(result)
 	// Output: [Lorem ipsum lectus sit amet]
 }
+
+func TestSkip(t *testing.T) {
+	expected := []int{1, 3, 1, 3, 1, 3}
+	result := FromSlice([]int{1, 2, 3, 1, 2, 3, 1, 2, 3}).Skip(2).Slice()
+
+	assert.Equal(t, expected, result)
+}
+
+func ExampleChan_Skip() {
+	result := FromSlice([]int{1, 2, 3, 1, 2, 3, 1, 2, 3}).Skip(2).Slice()
+
+	fmt.Println(result)
+	// Output: [1 3 1 3 1 3]
+}

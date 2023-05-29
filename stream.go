@@ -437,3 +437,21 @@ func (c Chan[T]) Substitute(old, new T) Chan[T] {
 
 	return output
 }
+
+// Skip iterates over main channel values skipping those equal to the passed
+// value.
+func (c Chan[T]) Skip(needle T) Chan[T] {
+	output := make(Chan[T])
+
+	go func() {
+		defer close(output)
+		for val := range c {
+			if val == needle {
+				continue
+			}
+			output <- val
+		}
+	}()
+
+	return output
+}
