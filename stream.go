@@ -381,8 +381,8 @@ func (c Chan[T]) Tee(f func(val T)) Chan[T] {
 
 // Enumerate decorates main channel values with an enumerated index starting at
 // the passed n.
-func (c Chan[T]) Enumerate(n int) chan Enum[T] {
-	output := make(chan Enum[T])
+func (c Chan[T]) Enumerate(n int) ChanEnum[T] {
+	output := make(ChanEnum[T])
 
 	go func() {
 		defer close(output)

@@ -54,7 +54,72 @@ func TestWriteToInt(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
+func TestWriteToIntPointer(t *testing.T) {
+	expected := []byte{1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0}
+
+	buf := new(bytes.Buffer)
+	one := 1
+	two := 2
+	err := FromSlice([]*int{&one, &two}).WriteTo(buf)
+	assert.NoError(t, err)
+
+	result := buf.Bytes()
+
+	assert.Equal(t, expected, result)
+}
+
+func TestWriteToUint(t *testing.T) {
+	expected := []byte{1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0}
+
+	buf := new(bytes.Buffer)
+	err := FromSlice([]uint{1, 2}).WriteTo(buf)
+	assert.NoError(t, err)
+
+	result := buf.Bytes()
+
+	assert.Equal(t, expected, result)
+}
+
+func TestWriteToUintPointer(t *testing.T) {
+	expected := []byte{1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0}
+
+	buf := new(bytes.Buffer)
+	one := uint(1)
+	two := uint(2)
+	err := FromSlice([]*uint{&one, &two}).WriteTo(buf)
+	assert.NoError(t, err)
+
+	result := buf.Bytes()
+
+	assert.Equal(t, expected, result)
+}
+
 func TestWriteToString(t *testing.T) {
+	expected := []byte{76, 111, 114, 101, 109}
+
+	buf := new(bytes.Buffer)
+	err := FromString("Lorem", "").WriteTo(buf)
+	assert.NoError(t, err)
+
+	result := buf.Bytes()
+
+	assert.Equal(t, expected, result)
+}
+
+func TestWriteToStringPointer(t *testing.T) {
+	expected := []byte{76, 111, 114, 101, 109}
+
+	buf := new(bytes.Buffer)
+	str := "Lorem"
+	err := FromSlice([]*string{&str}).WriteTo(buf)
+	assert.NoError(t, err)
+
+	result := buf.Bytes()
+
+	assert.Equal(t, expected, result)
+}
+
+func TestWriteToRunes(t *testing.T) {
 	expected := []byte{76, 0, 0, 0, 111, 0, 0, 0}
 
 	buf := new(bytes.Buffer)

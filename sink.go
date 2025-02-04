@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"unsafe"
 )
 
 // Drain drains the main channel of all values and will return once the main
@@ -36,7 +35,7 @@ func (c Chan[T]) WriteTo(w io.Writer) error {
 				return err
 			}
 		case *int:
-			err := binary.Write(w, binary.LittleEndian, uint64(uintptr(unsafe.Pointer(val))))
+			err := binary.Write(w, binary.LittleEndian, uint64(*val))
 			if err != nil {
 				return err
 			}
@@ -46,12 +45,7 @@ func (c Chan[T]) WriteTo(w io.Writer) error {
 				return err
 			}
 		case *uint:
-			err := binary.Write(w, binary.LittleEndian, uint64(uintptr(unsafe.Pointer(val))))
-			if err != nil {
-				return err
-			}
-		case uintptr:
-			err := binary.Write(w, binary.LittleEndian, uint64(val))
+			err := binary.Write(w, binary.LittleEndian, uint64(*val))
 			if err != nil {
 				return err
 			}
@@ -61,7 +55,7 @@ func (c Chan[T]) WriteTo(w io.Writer) error {
 				return err
 			}
 		case *string:
-			err := binary.Write(w, binary.LittleEndian, uint64(uintptr(unsafe.Pointer(val))))
+			err := binary.Write(w, binary.LittleEndian, []byte(*val))
 			if err != nil {
 				return err
 			}
