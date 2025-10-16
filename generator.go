@@ -117,6 +117,28 @@ func FromRunes(str string) Chan[rune] {
 	return output
 }
 
+// FromReader creates a channel that will return the bytes read from the
+// io.Reader implementation.
+func FromReader(r io.Reader) Chan[byte] {
+	output := make(Chan[byte])
+	buffer := make([]byte, 4096) // Default page size.
+
+	go func() {
+		defer close(output)
+		for {
+			n, err := r.Read(buffer)
+			for i := 0; i < n; i++ {
+				output <- buffer[i]
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	return output
+}
+
 // Iota creates a channel that will return integers based on the supplied
 // arguments. This channel will not close by itself and should be limited using
 // other methods.

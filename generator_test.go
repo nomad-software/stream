@@ -129,8 +129,8 @@ func ExampleFromString() {
 }
 
 func TestFromRunes(t *testing.T) {
-	expected := []rune{'L', 'o', 'r', 'e', 'm', ' ', 'i', 'p', 's', 'u'}
-	result := FromRunes("Lorem ipsum dolor sit amet").Take(10).Slice()
+	expected := []rune{'L', 'o', 'r', 'e', 'm', ' ', 'i', 'p', 's', 'u', 'm'}
+	result := FromRunes("Lorem ipsum dolor sit amet").Take(11).Slice()
 
 	assert.Equal(t, expected, result)
 }
@@ -140,6 +140,22 @@ func ExampleFromRunes() {
 
 	fmt.Println(string(result))
 	// Output: 😊
+}
+
+func TestFromReader(t *testing.T) {
+	expected := []byte("Lorem ipsum")
+	r := bytes.NewBufferString("Lorem ipsum dolor sit amet")
+	result := FromReader(r).Take(11).Slice()
+
+	assert.Equal(t, expected, result)
+}
+
+func ExampleFromReader() {
+	r := bytes.NewBufferString("Lorem ipsum dolor sit amet")
+	result := FromReader(r).Take(11).Slice()
+
+	fmt.Println(string(result))
+	// Output: Lorem ipsum
 }
 
 func TestIota(t *testing.T) {
