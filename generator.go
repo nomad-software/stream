@@ -127,7 +127,7 @@ func FromReader(r io.Reader) Chan[byte] {
 		defer close(output)
 		for {
 			n, err := r.Read(buffer)
-			for i := 0; i < n; i++ {
+			for i := range n {
 				output <- buffer[i]
 			}
 			if err != nil {
@@ -259,7 +259,7 @@ func ReadFrom(r io.Reader) Chan[byte] {
 		buf := make([]byte, 8)
 		for {
 			n, err := r.Read(buf)
-			for i := 0; i < n; i++ {
+			for i := range n {
 				output <- buf[i]
 			}
 			if err != nil {

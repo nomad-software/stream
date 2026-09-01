@@ -17,7 +17,7 @@ func (c Chan[T]) Take(n int) Chan[T] {
 
 	go func() {
 		defer close(output)
-		for i := 0; i < n; i++ {
+		for range n {
 			val, ok := <-c
 			if !ok {
 				return
@@ -193,7 +193,7 @@ func (c Chan[T]) Chunk(n int) ChanChan[T] {
 		defer close(output)
 		for {
 			chunk := make(Chan[T], n)
-			for i := 0; i < n; i++ {
+			for i := range n {
 				val, ok := <-c
 				if !ok {
 					if i > 0 {
@@ -218,7 +218,7 @@ func (c Chan[T]) Drop(n int) Chan[T] {
 
 	go func() {
 		defer close(output)
-		for i := 0; i < n; i++ {
+		for range n {
 			_, ok := <-c
 			if !ok {
 				return
@@ -344,7 +344,7 @@ func (c Chan[T]) PadLeft(val T, n int) Chan[T] {
 		output <- val
 	}
 
-	for i := 0; i < n; i++ {
+	for range n {
 		val, ok := <-c
 		if !ok {
 			break

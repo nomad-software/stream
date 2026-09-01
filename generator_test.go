@@ -87,7 +87,7 @@ func TestFromChannel(t *testing.T) {
 
 	go func() {
 		defer close(c)
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			c <- i
 		}
 	}()
@@ -103,7 +103,7 @@ func ExampleFromChannel() {
 
 	go func() {
 		defer close(c)
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			c <- i
 		}
 	}()
