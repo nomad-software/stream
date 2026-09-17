@@ -3,6 +3,8 @@ package stream
 import (
 	"fmt"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -69,6 +71,15 @@ func TestMap(t *testing.T) {
 			return val
 		}
 	}).String()
+
+	assert.Equal(t, expected, result)
+}
+
+func TestMapTypes(t *testing.T) {
+	expected := []int{5, 5, 5, 3, 4}
+	result := FromString("Lorem ipsum dolor sit amet", " ").Map(func(val string) int {
+		return len(val)
+	}).Slice()
 
 	assert.Equal(t, expected, result)
 }
@@ -491,4 +502,30 @@ func ExampleChan_Skip() {
 
 	fmt.Println(result)
 	// Output: [1 3 1 3 1 3]
+}
+
+func TestThrottle(t *testing.T) {
+	expected := []string{"Lorem", "ipsum", "dolor", "sit", "amet"}
+	result := FromString("Lorem ipsum dolor sit amet", " ").Throttle(10, time.Second).Slice()
+
+	assert.Equal(t, expected, result)
+}
+
+func ExampleChan_Throttle() {
+	t := &testing.T{}
+
+	synctest.Test(t, func(t *testing.T) {
+		result := FromString("Lorem ipsum dolor sit amet", " ").Throttle(1, time.Second).Tee(func(val string) {
+			fmt.Printf("%s: %s\n", time.Now().Format(time.RFC3339), val)
+		}).String()
+
+		fmt.Println(result)
+		// Output:
+		// 2000-01-01T00:00:00Z: Lorem
+		// 2000-01-01T00:00:01Z: ipsum
+		// 2000-01-01T00:00:02Z: dolor
+		// 2000-01-01T00:00:03Z: sit
+		// 2000-01-01T00:00:04Z: amet
+		// [Lorem ipsum dolor sit amet]
+	})
 }

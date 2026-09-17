@@ -1,5 +1,7 @@
 package stream
 
+import "time"
+
 // Generic channel types.
 type Chan[T comparable] chan T
 type ChanChan[T comparable] chan Chan[T]
@@ -53,8 +55,8 @@ func (c Chan[T]) Until(f func(val T) bool) Chan[T] {
 
 // Map mutates main channel values based on the passed function. The passed
 // function is called once for each value.
-func (c Chan[T]) Map(f func(val T) T) Chan[T] {
-	output := make(Chan[T])
+func (c Chan[T]) Map[R comparable](f func(val T) R) Chan[R] {
+	output := make(Chan[R])
 
 	go func() {
 		defer close(output)
@@ -450,6 +452,36 @@ func (c Chan[T]) Skip(needle T) Chan[T] {
 				continue
 			}
 			output <- val
+		}
+	}()
+
+	return output
+}
+
+// Throttle iterates over main channel values processing n per duration.
+func (c Chan[T]) Throttle(n int, d time.Duration) Chan[T] {
+	if n <= 0 || d <= 0 {
+		return c
+	}
+
+	output := make(Chan[T])
+
+	go func() {
+		defer close(output)
+
+		ticker := time.NewTicker(d)
+		defer ticker.Stop()
+
+		count := 0
+
+		for val := range c {
+			if count == n {
+				<-ticker.C
+				count = 0
+			}
+
+			output <- val
+			count++
 		}
 	}()
 
