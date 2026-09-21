@@ -46,7 +46,7 @@ func TestWriteToInt(t *testing.T) {
 	expected := []byte{1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0}
 
 	buf := new(bytes.Buffer)
-	err := Iota(1, 3, 1).WriteTo(buf)
+	err := Iota(1, 3, 1).Write(buf)
 	assert.NoError(t, err)
 
 	result := buf.Bytes()
@@ -60,7 +60,7 @@ func TestWriteToIntPointer(t *testing.T) {
 	buf := new(bytes.Buffer)
 	one := 1
 	two := 2
-	err := FromSlice([]*int{&one, &two}).WriteTo(buf)
+	err := FromSlice([]*int{&one, &two}).Write(buf)
 	assert.NoError(t, err)
 
 	result := buf.Bytes()
@@ -72,7 +72,7 @@ func TestWriteToUint(t *testing.T) {
 	expected := []byte{1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0}
 
 	buf := new(bytes.Buffer)
-	err := FromSlice([]uint{1, 2}).WriteTo(buf)
+	err := FromSlice([]uint{1, 2}).Write(buf)
 	assert.NoError(t, err)
 
 	result := buf.Bytes()
@@ -86,7 +86,7 @@ func TestWriteToUintPointer(t *testing.T) {
 	buf := new(bytes.Buffer)
 	one := uint(1)
 	two := uint(2)
-	err := FromSlice([]*uint{&one, &two}).WriteTo(buf)
+	err := FromSlice([]*uint{&one, &two}).Write(buf)
 	assert.NoError(t, err)
 
 	result := buf.Bytes()
@@ -98,7 +98,7 @@ func TestWriteToString(t *testing.T) {
 	expected := []byte{76, 111, 114, 101, 109}
 
 	buf := new(bytes.Buffer)
-	err := FromString("Lorem", "").WriteTo(buf)
+	err := FromString("Lorem", "").Write(buf)
 	assert.NoError(t, err)
 
 	result := buf.Bytes()
@@ -111,7 +111,7 @@ func TestWriteToStringPointer(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	str := "Lorem"
-	err := FromSlice([]*string{&str}).WriteTo(buf)
+	err := FromSlice([]*string{&str}).Write(buf)
 	assert.NoError(t, err)
 
 	result := buf.Bytes()
@@ -123,7 +123,7 @@ func TestWriteToRunes(t *testing.T) {
 	expected := []byte{76, 0, 0, 0, 111, 0, 0, 0}
 
 	buf := new(bytes.Buffer)
-	err := FromRunes("Lorem ipsum dolor sit amet").Take(2).WriteTo(buf)
+	err := FromRunes("Lorem ipsum dolor sit amet").Take(2).Write(buf)
 	assert.NoError(t, err)
 
 	result := buf.Bytes()
@@ -131,9 +131,9 @@ func TestWriteToRunes(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-func ExampleChan_WriteTo() {
+func ExampleChan_Write() {
 	buf := new(bytes.Buffer)
-	FromRunes("Lorem ipsum dolor sit amet").Take(2).WriteTo(buf)
+	FromRunes("Lorem ipsum dolor sit amet").Take(2).Write(buf)
 
 	fmt.Println(buf.Bytes())
 	// Output: [76 0 0 0 111 0 0 0]

@@ -13,7 +13,7 @@ func Example() {
 		Stride(3).
 		Take(2).
 		Reduce(join).
-		WriteTo(os.Stdout)
+		Write(os.Stdout)
 
 	// Output: Lorem ipsum
 }

@@ -515,9 +515,12 @@ func ExampleChan_Throttle() {
 	t := &testing.T{}
 
 	synctest.Test(t, func(t *testing.T) {
-		result := FromString("Lorem ipsum dolor sit amet", " ").Throttle(1, time.Second).Tee(func(val string) {
-			fmt.Printf("%s: %s\n", time.Now().Format(time.RFC3339), val)
-		}).String()
+		result := FromString("Lorem ipsum dolor sit amet", " ").
+			Throttle(1, time.Second).
+			Tee(func(val string) {
+				fmt.Printf("%s: %s\n", time.Now().Format(time.RFC3339), val)
+			}).
+			String()
 
 		fmt.Println(result)
 		// Output:
@@ -542,4 +545,41 @@ func ExampleChan_Distinct() {
 
 	fmt.Println(result)
 	// Output: [Lorem ipsum dolor sit amet]
+}
+
+func TestBuffer(t *testing.T) {
+	count := 0
+
+	synctest.Test(t, func(*testing.T) {
+		FromSlice([]int{1, 2, 3, 4, 5}).
+			Tee(func(val int) {
+				count++
+			}).
+			Buffer(5)
+
+		synctest.Wait()
+
+		assert.Equal(t, 5, count)
+	})
+}
+
+func ExampleChan_Buffer() {
+	t := &testing.T{}
+
+	synctest.Test(t, func(t *testing.T) {
+		FromSlice([]int{1, 2, 3, 4, 5}).
+			Tee(func(val int) {
+				fmt.Println(val)
+			}).
+			Buffer(5)
+
+		synctest.Wait()
+
+		// Output:
+		// 1
+		// 2
+		// 3
+		// 4
+		// 5
+	})
 }

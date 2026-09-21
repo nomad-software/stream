@@ -508,3 +508,18 @@ func (c Chan[T]) Distinct() Chan[T] {
 
 	return output
 }
+
+// Buffer iterates over main channel values returning a buffered channel for n
+// values.
+func (c Chan[T]) Buffer(n int) Chan[T] {
+	output := make(Chan[T], n)
+
+	go func() {
+		defer close(output)
+		for val := range c {
+			output <- val
+		}
+	}()
+
+	return output
+}
