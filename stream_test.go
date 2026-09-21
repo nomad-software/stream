@@ -529,3 +529,17 @@ func ExampleChan_Throttle() {
 		// [Lorem ipsum dolor sit amet]
 	})
 }
+
+func TestDistinct(t *testing.T) {
+	expected := []string{"Lorem", "ipsum", "dolor", "sit", "amet"}
+	result := FromString("Lorem ipsum ipsum dolor Lorem sit amet dolor amet sit", " ").Distinct().Slice()
+
+	assert.Equal(t, expected, result)
+}
+
+func ExampleChan_Distinct() {
+	result := FromString("Lorem ipsum ipsum dolor Lorem sit amet dolor amet sit", " ").Distinct().String()
+
+	fmt.Println(result)
+	// Output: [Lorem ipsum dolor sit amet]
+}

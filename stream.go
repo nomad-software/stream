@@ -4,7 +4,6 @@ import "time"
 
 // Generic channel types.
 type Chan[T comparable] chan T
-type ChanChan[T comparable] chan Chan[T]
 type ChanEnum[T comparable] chan Enum[T]
 
 // Enum adds an enumeration index to a value.
@@ -188,8 +187,8 @@ func (c Chan[T]) RoundRobin(b Chan[T], args ...Chan[T]) Chan[T] {
 
 // Chunk returns a channel full of channels of the passed length, filled with
 // values of the main channel.
-func (c Chan[T]) Chunk(n int) ChanChan[T] {
-	output := make(ChanChan[T])
+func (c Chan[T]) Chunk(n int) chan Chan[T] {
+	output := make(chan Chan[T])
 
 	go func() {
 		defer close(output)
@@ -282,8 +281,8 @@ func (c Chan[T]) Tail(n int) Chan[T] {
 
 // Zip returns a channel of channels containing the next values of the main
 // channel and all other passed channels, in order.
-func (c Chan[T]) Zip(b Chan[T], args ...Chan[T]) ChanChan[T] {
-	output := make(ChanChan[T])
+func (c Chan[T]) Zip(b Chan[T], args ...Chan[T]) chan Chan[T] {
+	output := make(chan Chan[T])
 
 	go func() {
 		defer close(output)
@@ -482,6 +481,28 @@ func (c Chan[T]) Throttle(n int, d time.Duration) Chan[T] {
 
 			output <- val
 			count++
+		}
+	}()
+
+	return output
+}
+
+
+// Distinct iterates over main channel values returning only distinct values.
+// This method will continually allocate memory tracking distinct values when
+// streaming.
+func (c Chan[T]) Distinct() Chan[T] {
+	output := make(Chan[T])
+	values := make(map[T]*T)
+
+	go func() {
+		defer close(output)
+		for val := range c {
+			if _, ok := values[val]; ok {
+				continue
+			}
+			output <- val
+			values[val] = nil
 		}
 	}()
 
