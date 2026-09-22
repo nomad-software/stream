@@ -1,6 +1,9 @@
 package stream
 
-import "time"
+import (
+	"time"
+	"sync"
+)
 
 // Generic channel types.
 type Chan[T comparable] chan T
@@ -66,6 +69,37 @@ func (c Chan[T]) Map[R comparable](f func(val T) R) Chan[R] {
 			}
 			output <- f(val)
 		}
+	}()
+
+	return output
+}
+
+// Map mutates main channel values based on the passed function. The passes
+// workers value is the amount of parallel workers spawned. The passed function
+// is called once for each value. The streamed values are not ordered.
+func (c Chan[T]) MapParallel[R comparable](workers int, f func(val T) R) Chan[R] {
+	output := make(Chan[R])
+
+	if workers <= 0 {
+		close(output)
+		return output
+	}
+
+	wg := new(sync.WaitGroup)
+	wg.Add(workers)
+
+	for range workers {
+		go func() {
+			defer wg.Done()
+			for val := range c {
+				output <- f(val)
+			}
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(output)
 	}()
 
 	return output

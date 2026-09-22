@@ -2,6 +2,7 @@ package stream
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -99,6 +100,54 @@ func ExampleChan_Map() {
 
 	fmt.Println(result)
 	// Output: Yberz vcfhz qbybe fvg nzrg
+}
+
+func TestMapParallel(t *testing.T) {
+	expected := []int{32, 76, 101, 105, 109, 109, 111, 112, 114, 115, 117}
+
+	synctest.Test(t, func(*testing.T) {
+		result := FromRunes("Lorem ipsum").
+			MapParallel(10, func(val rune) int {
+				// time.Sleep(time.Second)
+				// fmt.Printf("%s: %d\n", time.Now().Format(time.RFC3339), val)
+				return int(val)
+			}).
+			Slice()
+
+		synctest.Wait()
+		slices.Sort(result)
+
+		assert.Equal(t, expected, result)
+	})
+}
+
+func ExampleChan_MapParallel() {
+	t := &testing.T{}
+
+	synctest.Test(t, func(*testing.T) {
+		FromRunes("Lorem ipsum").
+			MapParallel(10, func(val rune) int {
+				fmt.Printf("%s\n", time.Now().Format(time.RFC3339))
+				time.Sleep(time.Second)
+				return int(val)
+			}).
+			Slice()
+
+		synctest.Wait()
+
+		// Output:
+		// 2000-01-01T00:00:00Z
+		// 2000-01-01T00:00:00Z
+		// 2000-01-01T00:00:00Z
+		// 2000-01-01T00:00:00Z
+		// 2000-01-01T00:00:00Z
+		// 2000-01-01T00:00:00Z
+		// 2000-01-01T00:00:00Z
+		// 2000-01-01T00:00:00Z
+		// 2000-01-01T00:00:00Z
+		// 2000-01-01T00:00:00Z
+		// 2000-01-01T00:00:01Z
+	})
 }
 
 func TestFilter(t *testing.T) {
