@@ -259,16 +259,16 @@ func TestReadFrom(t *testing.T) {
 	data := []byte("Lorem ipsum dolor sit amet")
 	r := bytes.NewReader(data)
 
-	result := ReadFrom(r).Take(11).Slice()
+	result := Read(r).Take(11).Slice()
 
 	assert.Equal(t, expected, string(result))
 }
 
-func ExampleReadFrom() {
+func ExampleRead() {
 	data := []byte("Lorem ipsum dolor sit amet")
 	r := bytes.NewReader(data)
 
-	result := ReadFrom(r).Take(11).Slice()
+	result := Read(r).Take(11).Slice()
 
 	fmt.Println(string(result))
 	// Output: Lorem ipsum
