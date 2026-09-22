@@ -25,7 +25,7 @@ func (c Chan[T]) Slice() []T {
 	return output
 }
 
-// WriteTo writes the main channel values as bytes to the writer argument.
+// Write writes the main channel values as bytes to the writer argument.
 func (c Chan[T]) Write(w io.Writer) error {
 	for v := range c {
 		switch val := any(v).(type) {

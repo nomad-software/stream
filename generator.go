@@ -117,8 +117,9 @@ func FromRunes(str string) Chan[rune] {
 	return output
 }
 
-// FromReader creates a channel that will return the bytes read from the
-// io.Reader implementation.
+// FromReader creates a byte channel returning bytes read from the passed reader.
+// The channel will close when the reader returns an error. This error could be
+// a EOF indicating the data has been exhausted or any other error.
 func FromReader(r io.Reader) Chan[byte] {
 	output := make(Chan[byte])
 	buffer := make([]byte, 4096) // Default page size.
@@ -242,29 +243,6 @@ func RandFloat64() Chan[float64] {
 		defer close(output)
 		for {
 			output <- rand.Float64()
-		}
-	}()
-
-	return output
-}
-
-// Read creates a byte channel returning bytes read from the passed reader.
-// The channel will close when the reader returns an error. This error could be
-// a EOF indicating the data has been exhausted or any other error.
-func Read(r io.Reader) Chan[byte] {
-	output := make(Chan[byte])
-
-	go func() {
-		defer close(output)
-		buf := make([]byte, 8)
-		for {
-			n, err := r.Read(buf)
-			for i := range n {
-				output <- buf[i]
-			}
-			if err != nil {
-				return
-			}
 		}
 	}()
 
