@@ -1,8 +1,8 @@
 package stream
 
 import (
-	"time"
 	"sync"
+	"time"
 )
 
 // Generic channel types.
@@ -355,15 +355,15 @@ func (c Chan[T]) PadRight(val T, n int) Chan[T] {
 
 	go func() {
 		defer close(output)
+
 		i := 0
 		for val := range c {
 			output <- val
 			i++
 		}
-		if i < n {
-			for val := range Repeat(val).Take(n - i) {
-				output <- val
-			}
+
+		for ; i < n; i++ {
+			output <- val
 		}
 	}()
 
@@ -375,7 +375,7 @@ func (c Chan[T]) PadRight(val T, n int) Chan[T] {
 func (c Chan[T]) PadLeft(val T, n int) Chan[T] {
 	output := make(Chan[T], n)
 
-	for val := range Repeat(val).Take(n) {
+	for range n {
 		output <- val
 	}
 

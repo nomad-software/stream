@@ -1,6 +1,7 @@
 package stream
 
 import (
+	"context"
 	"io"
 	"math/big"
 	"math/rand"
@@ -9,13 +10,18 @@ import (
 
 // FromSlice creates a channel that will return the items in the passed slice.
 // The channel will close when the slice values are exhausted.
-func FromSlice[T comparable](slice []T) Chan[T] {
+func FromSlice[T comparable](ctx context.Context, slice []T) Chan[T] {
 	output := make(Chan[T])
 
 	go func() {
 		defer close(output)
+
 		for _, e := range slice {
-			output <- e
+			select {
+			case output <- e:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
@@ -25,15 +31,21 @@ func FromSlice[T comparable](slice []T) Chan[T] {
 // Cycle creates a channel that will repeat the items in the passed slice
 // infinitely. This channel will not close by itself and should be limited using
 // other methods.
-func Cycle[T comparable](slice []T) Chan[T] {
+func Cycle[T comparable](ctx context.Context, slice []T) Chan[T] {
 	output := make(Chan[T])
 
 	go func() {
 		defer close(output)
-		for i := 0; i < len(slice); i++ {
-			output <- slice[i]
-			if i == len(slice)-1 {
-				i = -1
+
+		for i := 0; len(slice) > 0; i++ {
+			if i == len(slice) {
+				i = 0
+			}
+
+			select {
+			case output <- slice[i]:
+			case <-ctx.Done():
+				return
 			}
 		}
 	}()
@@ -44,13 +56,18 @@ func Cycle[T comparable](slice []T) Chan[T] {
 // Generate creates a channel that will return values returned from the passed
 // function. This channel will not close by itself and should be limited using
 // other methods.
-func Generate[T comparable](f func() T) Chan[T] {
+func Generate[T comparable](ctx context.Context, f func() T) Chan[T] {
 	output := make(Chan[T])
 
 	go func() {
 		defer close(output)
+
 		for {
-			output <- f()
+			select {
+			case output <- f():
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
@@ -59,13 +76,18 @@ func Generate[T comparable](f func() T) Chan[T] {
 
 // Repeat creates a channel that will repeat the passed value infinitely. This
 // channel will not close by itself and should be limited using other methods.
-func Repeat[T comparable](val T) Chan[T] {
+func Repeat[T comparable](ctx context.Context, val T) Chan[T] {
 	output := make(Chan[T])
 
 	go func() {
 		defer close(output)
+
 		for {
-			output <- val
+			select {
+			case output <- val:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
@@ -74,13 +96,28 @@ func Repeat[T comparable](val T) Chan[T] {
 
 // FromChannel creates a channel that will return the values of the passed
 // channel. The channel will close when passed channel is closed.
-func FromChannel[T comparable](c <-chan T) Chan[T] {
+func FromChannel[T comparable](ctx context.Context, c <-chan T) Chan[T] {
 	output := make(Chan[T])
 
 	go func() {
 		defer close(output)
-		for val := range c {
-			output <- val
+
+		for {
+			select {
+			case val, ok := <-c:
+				if !ok {
+					return
+				}
+
+				select {
+				case output <- val:
+				case <-ctx.Done():
+					return
+				}
+
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
@@ -89,13 +126,18 @@ func FromChannel[T comparable](c <-chan T) Chan[T] {
 
 // FromString creates a channel that will return strings delimited by a
 // separator. The channel will close when the strings are exhausted.
-func FromString(str string, sep string) Chan[string] {
+func FromString(ctx context.Context, str string, sep string) Chan[string] {
 	output := make(Chan[string])
 
 	go func() {
 		defer close(output)
-		for val := range FromSlice(strings.Split(str, sep)) {
-			output <- val
+
+		for _, val := range strings.Split(str, sep) {
+			select {
+			case output <- val:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
@@ -104,13 +146,18 @@ func FromString(str string, sep string) Chan[string] {
 
 // FromRunes creates a channel that will return the runes in the string. The
 // channel will close when the runes are exhausted.
-func FromRunes(str string) Chan[rune] {
+func FromRunes(ctx context.Context, str string) Chan[rune] {
 	output := make(Chan[rune])
 
 	go func() {
 		defer close(output)
+
 		for _, r := range str {
-			output <- r
+			select {
+			case output <- r:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
@@ -120,17 +167,24 @@ func FromRunes(str string) Chan[rune] {
 // FromReader creates a byte channel returning bytes read from the passed reader.
 // The channel will close when the reader returns an error. This error could be
 // a EOF indicating the data has been exhausted or any other error.
-func FromReader(r io.Reader) Chan[byte] {
+func FromReader(ctx context.Context, r io.Reader) Chan[byte] {
 	output := make(Chan[byte])
 	buffer := make([]byte, 4096) // Default page size.
 
 	go func() {
 		defer close(output)
+
 		for {
 			n, err := r.Read(buffer)
+
 			for i := range n {
-				output <- buffer[i]
+				select {
+				case output <- buffer[i]:
+				case <-ctx.Done():
+					return
+				}
 			}
+
 			if err != nil {
 				return
 			}
@@ -143,13 +197,18 @@ func FromReader(r io.Reader) Chan[byte] {
 // Iota creates a channel that will return integers based on the supplied
 // arguments. This channel will not close by itself and should be limited using
 // other methods.
-func Iota(start, end, step int) Chan[int] {
+func Iota(ctx context.Context, start, end, step int) Chan[int] {
 	output := make(Chan[int])
 
 	go func() {
 		defer close(output)
+
 		for i := start; i < end; i += step {
-			output <- i
+			select {
+			case output <- i:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
@@ -158,16 +217,22 @@ func Iota(start, end, step int) Chan[int] {
 
 // Fibonacci creates an integer channel returning the fibonacci sequence. This
 // channel will not close by itself and should be limited using other methods.
-func Fibonacci() Chan[*big.Int] {
+func Fibonacci(ctx context.Context) Chan[*big.Int] {
 	output := make(Chan[*big.Int])
 
 	go func() {
 		defer close(output)
+
 		a := big.NewInt(0)
 		b := big.NewInt(1)
+
 		for {
-			output <- big.NewInt(0).Set(a.Add(a, b))
-			a, b = b, a
+			select {
+			case output <- big.NewInt(0).Set(a.Add(a, b)):
+				a, b = b, a
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
@@ -177,26 +242,37 @@ func Fibonacci() Chan[*big.Int] {
 // Primes creates an integer channel returning prime numbers. The channel will
 // close when the sequence exceeds the returned channel's type limits which may
 // take a long time.
-func Primes() Chan[int] {
+func Primes(ctx context.Context) Chan[int] {
 	output := make(Chan[int])
 
 	go func() {
-		output <- 2
+		defer close(output)
+
+		select {
+		case output <- 2:
+		case <-ctx.Done():
+			return
+		}
+
 		primes := make([]int, 0)
+
 		for n := 3; n > 0; n += 2 {
 			isPrime := true
+
 			for _, prime := range primes {
 				if n%prime == 0 {
 					isPrime = false
 					break
 				}
 			}
+
 			if isPrime {
-				if n < 0 {
+				select {
+				case output <- n:
+					primes = append(primes, n)
+				case <-ctx.Done():
 					return
 				}
-				output <- n
-				primes = append(primes, n)
 			}
 		}
 	}()
@@ -206,13 +282,18 @@ func Primes() Chan[int] {
 
 // RandInt creates an integer channel returning random integers. This channel
 // will not close by itself and should be limited using other methods.
-func RandInt() Chan[int] {
+func RandInt(ctx context.Context) Chan[int] {
 	output := make(Chan[int])
 
 	go func() {
 		defer close(output)
+
 		for {
-			output <- rand.Int()
+			select {
+			case output <- rand.Int():
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
@@ -221,13 +302,18 @@ func RandInt() Chan[int] {
 
 // RandFloat32 creates a (32bit) float channel returning random floats. This
 // channel will not close by itself and should be limited using other methods.
-func RandFloat32() Chan[float32] {
+func RandFloat32(ctx context.Context) Chan[float32] {
 	output := make(Chan[float32])
 
 	go func() {
 		defer close(output)
+
 		for {
-			output <- rand.Float32()
+			select {
+			case output <- rand.Float32():
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
@@ -236,13 +322,18 @@ func RandFloat32() Chan[float32] {
 
 // RandFloat64 creates a (64bit) float channel returning random floats. This
 // channel will not close by itself and should be limited using other methods.
-func RandFloat64() Chan[float64] {
+func RandFloat64(ctx context.Context) Chan[float64] {
 	output := make(Chan[float64])
 
 	go func() {
 		defer close(output)
+
 		for {
-			output <- rand.Float64()
+			select {
+			case output <- rand.Float64():
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 

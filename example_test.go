@@ -1,6 +1,9 @@
 package stream
 
-import "os"
+import (
+	"context"
+	"os"
+)
 
 func join(a, b string) string {
 	return a + " " + b
@@ -9,7 +12,7 @@ func join(a, b string) string {
 func Example() {
 	text := "Lorem adipiscing elit ipsum sed neque dolor non libero sit consequat magna amet placerat bibendum"
 
-	FromString(text, " ").
+	FromString(context.Background(), text, " ").
 		Stride(3).
 		Take(2).
 		Reduce(join).
