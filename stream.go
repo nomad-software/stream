@@ -183,6 +183,45 @@ func (c Chan[T]) Chain(b Chan[T], args ...Chan[T]) Chan[T] {
 	return output
 }
 
+// Merge will return alternate values from the main channel and the passed
+// channels, when they are available.
+func (c Chan[T]) Merge(b Chan[T], args ...Chan[T]) Chan[T] {
+	output := make(Chan[T])
+
+	wg := new(sync.WaitGroup)
+	wg.Add(2+len(args))
+
+	go func() {
+		defer wg.Done()
+		for val := range c {
+			output <- val
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for val := range b {
+			output <- val
+		}
+	}()
+
+	for _, arg := range args {
+		go func() {
+			defer wg.Done()
+			for value := range arg {
+				output <- value
+			}
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(output)
+	}()
+
+	return output
+}
+
 // RoundRobin will return alternate values from the main channel and the passed
 // channels, in order.
 func (c Chan[T]) RoundRobin(b Chan[T], args ...Chan[T]) Chan[T] {
