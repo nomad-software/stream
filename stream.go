@@ -35,7 +35,7 @@ func (c Chan[T]) Take(n int) Chan[T] {
 
 // Until closes a channel when the passed function returns true, otherwise it
 // wll keep returning values. The passed function is called once for each value.
-func (c Chan[T]) Until(f func(val T) bool) Chan[T] {
+func (c Chan[T]) Until(f func(T) bool) Chan[T] {
 	output := make(Chan[T])
 
 	go func() {
@@ -57,7 +57,7 @@ func (c Chan[T]) Until(f func(val T) bool) Chan[T] {
 
 // Map mutates main channel values based on the passed function. The passed
 // function is called once for each value.
-func (c Chan[T]) Map[R comparable](f func(val T) R) Chan[R] {
+func (c Chan[T]) Map[R comparable](f func(T) R) Chan[R] {
 	output := make(Chan[R])
 
 	go func() {
@@ -77,7 +77,7 @@ func (c Chan[T]) Map[R comparable](f func(val T) R) Chan[R] {
 // Map mutates main channel values based on the passed function. The passes
 // workers value is the amount of parallel workers spawned. The passed function
 // is called once for each value. The streamed values are not ordered.
-func (c Chan[T]) MapParallel[R comparable](workers int, f func(val T) R) Chan[R] {
+func (c Chan[T]) MapParallel[R comparable](workers int, f func(T) R) Chan[R] {
 	output := make(Chan[R])
 
 	if workers <= 0 {
@@ -107,7 +107,7 @@ func (c Chan[T]) MapParallel[R comparable](workers int, f func(val T) R) Chan[R]
 
 // Filter filters main channel values based on the passed function returning
 // true. The passed function is called once for each value.
-func (c Chan[T]) Filter(f func(val T) bool) Chan[T] {
+func (c Chan[T]) Filter(f func(T) bool) Chan[T] {
 	output := make(Chan[T])
 
 	go func() {
@@ -128,7 +128,7 @@ func (c Chan[T]) Filter(f func(val T) bool) Chan[T] {
 
 // Reduce reduces main channel values to one value based on the passed function.
 // The passed function is called once for each value.
-func (c Chan[T]) Reduce(f func(a, b T) T) Chan[T] {
+func (c Chan[T]) Reduce(f func(T, T) T) Chan[T] {
 	output := make(Chan[T])
 
 	go func() {
@@ -439,7 +439,7 @@ func (c Chan[T]) PadLeft(val T, n int) Chan[T] {
 
 // Tee passes each main channel value to the passed function. The passed
 // function is called once for each value.
-func (c Chan[T]) Tee(f func(val T)) Chan[T] {
+func (c Chan[T]) Tee(f func(T)) Chan[T] {
 	output := make(Chan[T])
 
 	go func() {
