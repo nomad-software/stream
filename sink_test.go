@@ -12,20 +12,20 @@ import (
 func TestDrain(t *testing.T) {
 	c := FromRunes(context.Background(), "Lorem ipsum dolor sit amet")
 
-	assert.Equal(t, 'L', <-c)
-	assert.Equal(t, 'o', <-c)
+	assert.Equal(t, 'L', c.Pop())
+	assert.Equal(t, 'o', c.Pop())
 
 	c.Drain()
 
-	assert.Equal(t, int32(0), <-c)
+	assert.Equal(t, int32(0), c.Pop())
 }
 
-func ExampleChan_Drain() {
+func ExampleStream_Drain() {
 	c := FromRunes(context.Background(), "Lorem ipsum dolor sit amet")
 
 	c.Drain()
 
-	fmt.Println(<-c)
+	fmt.Println(c.Pop())
 	// Output: 0
 }
 
@@ -36,7 +36,7 @@ func TestSlice(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-func ExampleChan_Slice() {
+func ExampleStream_Slice() {
 	result := Iota(context.Background(), 1, 5, 1).Slice()
 
 	fmt.Println(result)
@@ -69,6 +69,14 @@ func TestWriteToIntPointer(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
+func TestWriteToIntNilPointer(t *testing.T) {
+	buf := new(bytes.Buffer)
+	err := FromSlice(context.Background(), []*int{nil}).Write(buf)
+	assert.EqualError(t, err, "cannot write nil *int")
+
+	assert.Empty(t, buf.Bytes())
+}
+
 func TestWriteToUint(t *testing.T) {
 	expected := []byte{1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0}
 
@@ -93,6 +101,14 @@ func TestWriteToUintPointer(t *testing.T) {
 	result := buf.Bytes()
 
 	assert.Equal(t, expected, result)
+}
+
+func TestWriteToUintNilPointer(t *testing.T) {
+	buf := new(bytes.Buffer)
+	err := FromSlice(context.Background(), []*uint{nil}).Write(buf)
+	assert.EqualError(t, err, "cannot write nil *uint")
+
+	assert.Empty(t, buf.Bytes())
 }
 
 func TestWriteToString(t *testing.T) {
@@ -120,6 +136,14 @@ func TestWriteToStringPointer(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
+func TestWriteToStringNilPointer(t *testing.T) {
+	buf := new(bytes.Buffer)
+	err := FromSlice(context.Background(), []*string{nil}).Write(buf)
+	assert.EqualError(t, err, "cannot write nil *string")
+
+	assert.Empty(t, buf.Bytes())
+}
+
 func TestWriteToRunes(t *testing.T) {
 	expected := []byte{76, 0, 0, 0, 111, 0, 0, 0}
 
@@ -132,7 +156,7 @@ func TestWriteToRunes(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-func ExampleChan_Write() {
+func ExampleStream_Write() {
 	buf := new(bytes.Buffer)
 	FromRunes(context.Background(), "Lorem ipsum dolor sit amet").Take(2).Write(buf)
 
@@ -140,23 +164,23 @@ func ExampleChan_Write() {
 	// Output: [76 0 0 0 111 0 0 0]
 }
 
-func TestString(t *testing.T) {
+func TestToString(t *testing.T) {
 	expected := "[1 2 3 4 5 6 7 8 9]"
-	result := Iota(context.Background(), 1, 10, 1).String()
+	result := Iota(context.Background(), 1, 10, 1).ToString()
 
 	assert.Equal(t, expected, result)
 }
 
-func ExampleChan_String() {
-	result := Iota(context.Background(), 1, 10, 1).String()
+func ExampleStream_ToString() {
+	result := Iota(context.Background(), 1, 10, 1).ToString()
 
 	fmt.Println(result)
 	// Output: [1 2 3 4 5 6 7 8 9]
 }
 
-func TestStringRunes(t *testing.T) {
+func TestToStringRunes(t *testing.T) {
 	expected := "Lorem ipsum"
-	result := FromRunes(context.Background(), "Lorem ipsum dolor sit amet").Take(11).String()
+	result := FromRunes(context.Background(), "Lorem ipsum dolor sit amet").Take(11).ToString()
 
 	assert.Equal(t, expected, result)
 }
@@ -168,7 +192,7 @@ func TestPop(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-func ExampleChan_Pop() {
+func ExampleStream_Pop() {
 	result := Iota(context.Background(), 2, 20, 2).Drop(6).Pop()
 
 	fmt.Println(result)
@@ -179,7 +203,7 @@ func TestPrint(t *testing.T) {
 	Iota(context.Background(), 2, 10, 2).Print()
 }
 
-func ExampleChan_Print() {
+func ExampleStream_Print() {
 	Primes(context.Background()).Take(10).Print()
 	// Output: [2 3 5 7 11 13 17 19 23 29]
 }
