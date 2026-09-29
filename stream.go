@@ -1,13 +1,21 @@
 package stream
 
 import (
+	"context"
+	"iter"
 	"sync"
 	"time"
 )
 
-// Generic channel types.
-type Chan[T comparable] chan T
-type ChanEnum[T comparable] chan Enum[T]
+// Stream is a stream of values bound to a context. Cancelling the context stops
+// every stage of the stream. A context is stored here, against the usual
+// guidance, because a stream represents the lifetime of a single operation.
+// Streams should be created using a generator. The zero value behaves like a nil
+// channel and blocks forever.
+type Stream[T comparable] struct {
+	ctx context.Context
+	c   chan T
+}
 
 // Enum adds an enumeration index to a value.
 type Enum[T comparable] struct {
@@ -15,18 +23,100 @@ type Enum[T comparable] struct {
 	Val   T   `json:"val"`
 }
 
-// Take returns n items from the main channel before closing it.
-func (c Chan[T]) Take(n int) Chan[T] {
-	output := make(Chan[T])
+// newStream creates a stream bound to the passed context with a buffer of the
+// passed size.
+func newStream[T comparable](ctx context.Context, size int) Stream[T] {
+	return Stream[T]{
+		ctx: ctx,
+		c:   make(chan T, size),
+	}
+}
 
-	go func() {
-		defer close(output)
-		for range n {
-			val, ok := <-c
+// context returns the stream's context, or a background context if the stream
+// is the zero value.
+func (c Stream[T]) context() context.Context {
+	if c.ctx == nil {
+		return context.Background()
+	}
+	return c.ctx
+}
+
+// withContext returns the same stream bound to the passed context.
+func (c Stream[T]) withContext(ctx context.Context) Stream[T] {
+	c.ctx = ctx
+	return c
+}
+
+// send sends a value to a channel. It returns false if the context was
+// cancelled before the value could be sent.
+func send[T any](ctx context.Context, c chan<- T, val T) bool {
+	select {
+	case c <- val:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+// recv receives a value from a channel. It returns false if the channel was
+// closed or the context was cancelled.
+func recv[T any](ctx context.Context, c <-chan T) (T, bool) {
+	select {
+	case val, ok := <-c:
+		return val, ok
+	case <-ctx.Done():
+		var zero T
+		return zero, false
+	}
+}
+
+// send sends a value to the stream. It returns false if the stream's context
+// was cancelled before the value could be sent.
+func (c Stream[T]) send(val T) bool {
+	return send(c.context(), c.c, val)
+}
+
+// recv receives a value from the stream. It returns false if the stream was
+// closed or the stream's context was cancelled.
+func (c Stream[T]) recv() (T, bool) {
+	return recv(c.context(), c.c)
+}
+
+// close closes the stream.
+func (c Stream[T]) close() {
+	close(c.c)
+}
+
+// All returns an iterator over the main channel values. Iteration stops when
+// the main channel is closed or its context is cancelled.
+func (c Stream[T]) All() iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for {
+			val, ok := c.recv()
 			if !ok {
 				return
 			}
-			output <- val
+			if !yield(val) {
+				return
+			}
+		}
+	}
+}
+
+// Take returns n items from the main channel before closing it.
+func (c Stream[T]) Take(n int) Stream[T] {
+	output := newStream[T](c.context(), 0)
+
+	go func() {
+		defer output.close()
+		for range n {
+			val, ok := c.recv()
+			if !ok {
+				return
+			}
+			if !output.send(val) {
+				return
+			}
 		}
 	}()
 
@@ -35,20 +125,18 @@ func (c Chan[T]) Take(n int) Chan[T] {
 
 // Until closes a channel when the passed function returns true, otherwise it
 // wll keep returning values. The passed function is called once for each value.
-func (c Chan[T]) Until(f func(T) bool) Chan[T] {
-	output := make(Chan[T])
+func (c Stream[T]) Until(f func(T) bool) Stream[T] {
+	output := newStream[T](c.context(), 0)
 
 	go func() {
-		defer close(output)
-		for {
-			val, ok := <-c
-			if !ok {
-				return
-			}
+		defer output.close()
+		for val := range c.All() {
 			if f(val) {
 				return
 			}
-			output <- val
+			if !output.send(val) {
+				return
+			}
 		}
 	}()
 
@@ -57,17 +145,15 @@ func (c Chan[T]) Until(f func(T) bool) Chan[T] {
 
 // Map mutates main channel values based on the passed function. The passed
 // function is called once for each value.
-func (c Chan[T]) Map[R comparable](f func(T) R) Chan[R] {
-	output := make(Chan[R])
+func (c Stream[T]) Map[R comparable](f func(T) R) Stream[R] {
+	output := newStream[R](c.context(), 0)
 
 	go func() {
-		defer close(output)
-		for {
-			val, ok := <-c
-			if !ok {
+		defer output.close()
+		for val := range c.All() {
+			if !output.send(f(val)) {
 				return
 			}
-			output <- f(val)
 		}
 	}()
 
@@ -77,11 +163,11 @@ func (c Chan[T]) Map[R comparable](f func(T) R) Chan[R] {
 // Map mutates main channel values based on the passed function. The passes
 // workers value is the amount of parallel workers spawned. The passed function
 // is called once for each value. The streamed values are not ordered.
-func (c Chan[T]) MapParallel[R comparable](workers int, f func(T) R) Chan[R] {
-	output := make(Chan[R])
+func (c Stream[T]) MapParallel[R comparable](workers int, f func(T) R) Stream[R] {
+	output := newStream[R](c.context(), 0)
 
 	if workers <= 0 {
-		close(output)
+		output.close()
 		return output
 	}
 
@@ -91,15 +177,17 @@ func (c Chan[T]) MapParallel[R comparable](workers int, f func(T) R) Chan[R] {
 	for range workers {
 		go func() {
 			defer wg.Done()
-			for val := range c {
-				output <- f(val)
+			for val := range c.All() {
+				if !output.send(f(val)) {
+					return
+				}
 			}
 		}()
 	}
 
 	go func() {
 		wg.Wait()
-		close(output)
+		output.close()
 	}()
 
 	return output
@@ -107,18 +195,17 @@ func (c Chan[T]) MapParallel[R comparable](workers int, f func(T) R) Chan[R] {
 
 // Filter filters main channel values based on the passed function returning
 // true. The passed function is called once for each value.
-func (c Chan[T]) Filter(f func(T) bool) Chan[T] {
-	output := make(Chan[T])
+func (c Stream[T]) Filter(f func(T) bool) Stream[T] {
+	output := newStream[T](c.context(), 0)
 
 	go func() {
-		defer close(output)
-		for {
-			val, ok := <-c
-			if !ok {
-				return
+		defer output.close()
+		for val := range c.All() {
+			if !f(val) {
+				continue
 			}
-			if f(val) {
-				output <- val
+			if !output.send(val) {
+				return
 			}
 		}
 	}()
@@ -128,54 +215,72 @@ func (c Chan[T]) Filter(f func(T) bool) Chan[T] {
 
 // Reduce reduces main channel values to one value based on the passed function.
 // The passed function is called once for each value.
-func (c Chan[T]) Reduce(f func(T, T) T) Chan[T] {
-	output := make(Chan[T])
+func (c Stream[T]) Reduce(f func(T, T) T) Stream[T] {
+	output := newStream[T](c.context(), 0)
 
 	go func() {
-		defer close(output)
+		defer output.close()
 
-		var a T = <-c
-		for val := range c {
+		a, ok := c.recv()
+		if !ok {
+			return
+		}
+		for val := range c.All() {
 			a = f(a, val)
 		}
-		output <- a
+		if c.context().Err() != nil {
+			return
+		}
+		output.send(a)
 	}()
 
 	return output
 }
 
 // Last will return the final value from the channel once it is closed.
-func (c Chan[T]) Last() Chan[T] {
-	output := make(Chan[T])
+func (c Stream[T]) Last() Stream[T] {
+	output := newStream[T](c.context(), 0)
 
 	go func() {
-		defer close(output)
-		var last T = <-c
-		for val := range c {
+		defer output.close()
+		last, ok := c.recv()
+		if !ok {
+			return
+		}
+		for val := range c.All() {
 			last = val
 		}
-		output <- last
+		if c.context().Err() != nil {
+			return
+		}
+		output.send(last)
 	}()
 
 	return output
 }
 
 // Chain will append values from the passed channels to the end of the main
-// channel.
-func (c Chan[T]) Chain(b Chan[T], args ...Chan[T]) Chan[T] {
-	output := make(Chan[T])
+// channel. The main channel's context is used for all channels.
+func (c Stream[T]) Chain(b Stream[T], args ...Stream[T]) Stream[T] {
+	output := newStream[T](c.context(), 0)
 
 	go func() {
-		defer close(output)
-		for val := range c {
-			output <- val
+		defer output.close()
+		for val := range c.All() {
+			if !output.send(val) {
+				return
+			}
 		}
-		for val := range b {
-			output <- val
+		for val := range b.withContext(c.context()).All() {
+			if !output.send(val) {
+				return
+			}
 		}
 		for _, arg := range args {
-			for val := range arg {
-				output <- val
+			for val := range arg.withContext(c.context()).All() {
+				if !output.send(val) {
+					return
+				}
 			}
 		}
 	}()
@@ -185,69 +290,71 @@ func (c Chan[T]) Chain(b Chan[T], args ...Chan[T]) Chan[T] {
 
 // Merge will return alternate values from the main channel and the passed
 // channels, when they are available.
-func (c Chan[T]) Merge(b Chan[T], args ...Chan[T]) Chan[T] {
-	output := make(Chan[T])
+func (c Stream[T]) Merge(b Stream[T], args ...Stream[T]) Stream[T] {
+	output := newStream[T](c.context(), 0)
 
 	wg := new(sync.WaitGroup)
 	wg.Add(2+len(args))
 
 	go func() {
 		defer wg.Done()
-		for val := range c {
-			output <- val
+		for val := range c.All() {
+			if !output.send(val) {
+				return
+			}
 		}
 	}()
 
 	go func() {
 		defer wg.Done()
-		for val := range b {
-			output <- val
+		for val := range b.withContext(c.context()).All() {
+			if !output.send(val) {
+				return
+			}
 		}
 	}()
 
 	for _, arg := range args {
 		go func() {
 			defer wg.Done()
-			for value := range arg {
-				output <- value
+			for val := range arg.withContext(c.context()).All() {
+				if !output.send(val) {
+					return
+				}
 			}
 		}()
 	}
 
 	go func() {
 		wg.Wait()
-		close(output)
+		output.close()
 	}()
 
 	return output
 }
 
 // RoundRobin will return alternate values from the main channel and the passed
-// channels, in order.
-func (c Chan[T]) RoundRobin(b Chan[T], args ...Chan[T]) Chan[T] {
-	output := make(Chan[T])
+// channels, in order. The main channel's context is used for all channels.
+func (c Stream[T]) RoundRobin(b Stream[T], args ...Stream[T]) Stream[T] {
+	output := newStream[T](c.context(), 0)
+	inputs := []Stream[T]{c, b.withContext(c.context())}
+	for _, arg := range args {
+		inputs = append(inputs, arg.withContext(c.context()))
+	}
 
 	go func() {
-		defer close(output)
+		defer output.close()
 		for {
 			available := false
-			val, ok := <-c
-			if ok {
-				available = true
-				output <- val
-			}
-			val, ok = <-b
-			if ok {
-				available = true
-				output <- val
-			}
-			for _, arg := range args {
-				val, ok = <-arg
-				if ok {
-					available = true
-					output <- val
+			for _, input := range inputs {
+				val, ok := input.recv()
+				if !ok {
+					continue
 				}
-				break
+				available = true
+				if !output.send(val) {
+					return
+				}
 			}
 			if !available {
 				return
@@ -260,26 +367,33 @@ func (c Chan[T]) RoundRobin(b Chan[T], args ...Chan[T]) Chan[T] {
 
 // Chunk returns a channel full of channels of the passed length, filled with
 // values of the main channel.
-func (c Chan[T]) Chunk(n int) chan Chan[T] {
-	output := make(chan Chan[T])
+func (c Stream[T]) Chunk(n int) chan Stream[T] {
+	output := make(chan Stream[T])
+
+	if n <= 0 {
+		close(output)
+		return output
+	}
 
 	go func() {
 		defer close(output)
 		for {
-			chunk := make(Chan[T], n)
+			chunk := newStream[T](c.context(), n)
 			for i := range n {
-				val, ok := <-c
+				val, ok := c.recv()
 				if !ok {
-					if i > 0 {
-						close(chunk)
-						output <- chunk
+					if i > 0 && c.context().Err() == nil {
+						chunk.close()
+						send(c.context(), output, chunk)
 					}
 					return
 				}
-				chunk <- val
+				chunk.c <- val
 			}
-			close(chunk)
-			output <- chunk
+			chunk.close()
+			if !send(c.context(), output, chunk) {
+				return
+			}
 		}
 	}()
 
@@ -287,19 +401,21 @@ func (c Chan[T]) Chunk(n int) chan Chan[T] {
 }
 
 // Drop removes n values from the main channel before continuing.
-func (c Chan[T]) Drop(n int) Chan[T] {
-	output := make(Chan[T])
+func (c Stream[T]) Drop(n int) Stream[T] {
+	output := newStream[T](c.context(), 0)
 
 	go func() {
-		defer close(output)
+		defer output.close()
 		for range n {
-			_, ok := <-c
+			_, ok := c.recv()
 			if !ok {
 				return
 			}
 		}
-		for val := range c {
-			output <- val
+		for val := range c.All() {
+			if !output.send(val) {
+				return
+			}
 		}
 	}()
 
@@ -308,15 +424,22 @@ func (c Chan[T]) Drop(n int) Chan[T] {
 
 // Stride iterates over channel values returning every n value of the main
 // channel.
-func (c Chan[T]) Stride(n int) Chan[T] {
-	output := make(Chan[T])
+func (c Stream[T]) Stride(n int) Stream[T] {
+	output := newStream[T](c.context(), 0)
+
+	if n <= 0 {
+		output.close()
+		return output
+	}
 
 	go func() {
-		defer close(output)
+		defer output.close()
 		i := 0
-		for val := range c {
+		for val := range c.All() {
 			if i%n == 0 {
-				output <- val
+				if !output.send(val) {
+					return
+				}
 				i = 0
 			}
 			i++
@@ -328,14 +451,19 @@ func (c Chan[T]) Stride(n int) Chan[T] {
 
 // Tail returns a channel containing the last n values of the main channel once
 // it's closed.
-func (c Chan[T]) Tail(n int) Chan[T] {
-	output := make(Chan[T])
+func (c Stream[T]) Tail(n int) Stream[T] {
+	output := newStream[T](c.context(), 0)
+
+	if n <= 0 {
+		output.close()
+		return output
+	}
 
 	go func() {
-		defer close(output)
-		tail := make(Chan[T], n)
+		defer output.close()
+		tail := make(chan T, n)
 		i := 0
-		for val := range c {
+		for val := range c.All() {
 			if i >= n {
 				<-tail
 			} else {
@@ -343,9 +471,14 @@ func (c Chan[T]) Tail(n int) Chan[T] {
 			}
 			tail <- val
 		}
+		if c.context().Err() != nil {
+			return
+		}
 		close(tail)
 		for val := range tail {
-			output <- val
+			if !output.send(val) {
+				return
+			}
 		}
 	}()
 
@@ -353,34 +486,30 @@ func (c Chan[T]) Tail(n int) Chan[T] {
 }
 
 // Zip returns a channel of channels containing the next values of the main
-// channel and all other passed channels, in order.
-func (c Chan[T]) Zip(b Chan[T], args ...Chan[T]) chan Chan[T] {
-	output := make(chan Chan[T])
+// channel and all other passed channels, in order. The main channel's context
+// is used for all channels.
+func (c Stream[T]) Zip(b Stream[T], args ...Stream[T]) chan Stream[T] {
+	output := make(chan Stream[T])
+	inputs := []Stream[T]{c, b.withContext(c.context())}
+	for _, arg := range args {
+		inputs = append(inputs, arg.withContext(c.context()))
+	}
 
 	go func() {
 		defer close(output)
 		for {
-			zip := make(Chan[T], len(args)+2)
-			val, ok := <-c
-			if !ok {
-				return
-			}
-			zip <- val
-			val, ok = <-b
-			if !ok {
-				return
-			}
-			zip <- val
-			for _, arg := range args {
-				val, ok = <-arg
+			zip := newStream[T](c.context(), len(inputs))
+			for _, input := range inputs {
+				val, ok := input.recv()
 				if !ok {
 					return
 				}
-				zip <- val
-				break
+				zip.c <- val
 			}
-			close(zip)
-			output <- zip
+			zip.close()
+			if !send(c.context(), output, zip) {
+				return
+			}
 		}
 	}()
 
@@ -389,20 +518,28 @@ func (c Chan[T]) Zip(b Chan[T], args ...Chan[T]) chan Chan[T] {
 
 // PadRight adds values to the end of the main channel if that channel's values
 // are fewer than the passed padding amount once the channel is closed.
-func (c Chan[T]) PadRight(val T, n int) Chan[T] {
-	output := make(Chan[T])
+func (c Stream[T]) PadRight(val T, n int) Stream[T] {
+	output := newStream[T](c.context(), 0)
 
 	go func() {
-		defer close(output)
+		defer output.close()
 
 		i := 0
-		for val := range c {
-			output <- val
+		for val := range c.All() {
+			if !output.send(val) {
+				return
+			}
 			i++
 		}
 
+		if c.context().Err() != nil {
+			return
+		}
+
 		for ; i < n; i++ {
-			output <- val
+			if !output.send(val) {
+				return
+			}
 		}
 	}()
 
@@ -411,26 +548,41 @@ func (c Chan[T]) PadRight(val T, n int) Chan[T] {
 
 // PadLeft adds values to the beginning of the main channel if that channel's values
 // are fewer than the passed padding amount.
-func (c Chan[T]) PadLeft(val T, n int) Chan[T] {
-	output := make(Chan[T], n)
-
-	for range n {
-		output <- val
-	}
-
-	for range n {
-		val, ok := <-c
-		if !ok {
-			break
-		}
-		<-output
-		output <- val
-	}
+func (c Stream[T]) PadLeft(val T, n int) Stream[T] {
+	output := newStream[T](c.context(), 0)
 
 	go func() {
-		defer close(output)
-		for val := range c {
-			output <- val
+		defer output.close()
+
+		head := make([]T, 0)
+		for range n {
+			e, ok := c.recv()
+			if !ok {
+				break
+			}
+			head = append(head, e)
+		}
+
+		if c.context().Err() != nil {
+			return
+		}
+
+		for range n - len(head) {
+			if !output.send(val) {
+				return
+			}
+		}
+
+		for _, e := range head {
+			if !output.send(e) {
+				return
+			}
+		}
+
+		for e := range c.All() {
+			if !output.send(e) {
+				return
+			}
 		}
 	}()
 
@@ -439,14 +591,16 @@ func (c Chan[T]) PadLeft(val T, n int) Chan[T] {
 
 // Tee passes each main channel value to the passed function. The passed
 // function is called once for each value.
-func (c Chan[T]) Tee(f func(T)) Chan[T] {
-	output := make(Chan[T])
+func (c Stream[T]) Tee(f func(T)) Stream[T] {
+	output := newStream[T](c.context(), 0)
 
 	go func() {
-		defer close(output)
-		for val := range c {
+		defer output.close()
+		for val := range c.All() {
 			f(val)
-			output <- val
+			if !output.send(val) {
+				return
+			}
 		}
 	}()
 
@@ -455,15 +609,18 @@ func (c Chan[T]) Tee(f func(T)) Chan[T] {
 
 // Enumerate decorates main channel values with an enumerated index starting at
 // the passed n.
-func (c Chan[T]) Enumerate(n int) ChanEnum[T] {
-	output := make(ChanEnum[T])
+func (c Stream[T]) Enumerate(n int) chan Enum[T] {
+	output := make(chan Enum[T])
 
 	go func() {
 		defer close(output)
-		for val := range c {
-			output <- Enum[T]{
+		for val := range c.All() {
+			enum := Enum[T]{
 				Index: n,
 				Val:   val,
+			}
+			if !send(c.context(), output, enum) {
+				return
 			}
 			n++
 		}
@@ -474,19 +631,23 @@ func (c Chan[T]) Enumerate(n int) ChanEnum[T] {
 
 // Find drains the main channel until the passed needle value is found then
 // normal iteration continues.
-func (c Chan[T]) Find(needle T) Chan[T] {
-	output := make(Chan[T])
+func (c Stream[T]) Find(needle T) Stream[T] {
+	output := newStream[T](c.context(), 0)
 
 	go func() {
-		defer close(output)
-		for val := range c {
+		defer output.close()
+		for val := range c.All() {
 			if val == needle {
-				output <- val
+				if !output.send(val) {
+					return
+				}
 				break
 			}
 		}
-		for val := range c {
-			output <- val
+		for val := range c.All() {
+			if !output.send(val) {
+				return
+			}
 		}
 	}()
 
@@ -495,17 +656,18 @@ func (c Chan[T]) Find(needle T) Chan[T] {
 
 // Substitute iterates over main channel values replacing the passed old value
 // with the new value.
-func (c Chan[T]) Substitute(old, new T) Chan[T] {
-	output := make(Chan[T])
+func (c Stream[T]) Substitute(old, new T) Stream[T] {
+	output := newStream[T](c.context(), 0)
 
 	go func() {
-		defer close(output)
-		for val := range c {
+		defer output.close()
+		for val := range c.All() {
 			if val == old {
-				output <- new
-				continue
+				val = new
 			}
-			output <- val
+			if !output.send(val) {
+				return
+			}
 		}
 	}()
 
@@ -514,67 +676,77 @@ func (c Chan[T]) Substitute(old, new T) Chan[T] {
 
 // Skip iterates over main channel values skipping those equal to the passed
 // value.
-func (c Chan[T]) Skip(needle T) Chan[T] {
-	output := make(Chan[T])
+func (c Stream[T]) Skip(needle T) Stream[T] {
+	output := newStream[T](c.context(), 0)
 
 	go func() {
-		defer close(output)
-		for val := range c {
+		defer output.close()
+		for val := range c.All() {
 			if val == needle {
 				continue
 			}
-			output <- val
+			if !output.send(val) {
+				return
+			}
 		}
 	}()
 
 	return output
 }
 
-// Throttle iterates over main channel values processing n per duration.
-func (c Chan[T]) Throttle(n int, d time.Duration) Chan[T] {
+// Throttle iterates over main channel values processing no more than n within
+// any period of the passed duration.
+func (c Stream[T]) Throttle(n int, d time.Duration) Stream[T] {
 	if n <= 0 || d <= 0 {
 		return c
 	}
 
-	output := make(Chan[T])
+	output := newStream[T](c.context(), 0)
 
 	go func() {
-		defer close(output)
+		defer output.close()
 
-		ticker := time.NewTicker(d)
-		defer ticker.Stop()
+		// The times of the last n sends, used as a ring buffer. Each slot
+		// holds the time of the send n sends ago, or zero if there wasn't one.
+		sent := make([]time.Time, n)
+		i := 0
 
-		count := 0
-
-		for val := range c {
-			if count == n {
-				<-ticker.C
-				count = 0
+		for val := range c.All() {
+			if wait := time.Until(sent[i].Add(d)); wait > 0 {
+				select {
+				case <-time.After(wait):
+				case <-c.context().Done():
+					return
+				}
 			}
 
-			output <- val
-			count++
+			if !output.send(val) {
+				return
+			}
+			sent[i] = time.Now()
+			i = (i + 1) % n
 		}
 	}()
 
 	return output
 }
 
-
 // Distinct iterates over main channel values returning only distinct values.
 // This method will continually allocate memory tracking distinct values when
 // streaming.
-func (c Chan[T]) Distinct() Chan[T] {
-	output := make(Chan[T])
+func (c Stream[T]) Distinct() Stream[T] {
+	output := newStream[T](c.context(), 0)
 	values := make(map[T]*T)
 
 	go func() {
-		defer close(output)
-		for val := range c {
+		defer output.close()
+		for val := range c.All() {
 			if _, ok := values[val]; ok {
 				continue
 			}
-			output <- val
+			if !output.send(val) {
+				return
+			}
 			values[val] = nil
 		}
 	}()
@@ -584,13 +756,15 @@ func (c Chan[T]) Distinct() Chan[T] {
 
 // Buffer iterates over main channel values returning a buffered channel for n
 // values.
-func (c Chan[T]) Buffer(n int) Chan[T] {
-	output := make(Chan[T], n)
+func (c Stream[T]) Buffer(n int) Stream[T] {
+	output := newStream[T](c.context(), max(n, 0))
 
 	go func() {
-		defer close(output)
-		for val := range c {
-			output <- val
+		defer output.close()
+		for val := range c.All() {
+			if !output.send(val) {
+				return
+			}
 		}
 	}()
 

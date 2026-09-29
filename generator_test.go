@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math"
 	"math/big"
 	"testing"
 	"testing/synctest"
@@ -33,7 +34,7 @@ func TestFromSliceWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream
+		_, ok := <-stream.c
 		assert.False(t, ok, "expected stream to be closed")
 	})
 }
@@ -70,7 +71,7 @@ func TestCycleWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream
+		_, ok := <-stream.c
 		assert.False(t, ok, "expected stream to be closed")
 	})
 }
@@ -110,7 +111,7 @@ func TestGenerateWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream
+		_, ok := <-stream.c
 		assert.False(t, ok, "expected stream to be closed")
 	})
 }
@@ -144,7 +145,7 @@ func TestRepeatWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream
+		_, ok := <-stream.c
 		assert.False(t, ok, "expected stream to be closed")
 	})
 }
@@ -191,7 +192,7 @@ func TestFromChannelWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream
+		_, ok := <-stream.c
 		assert.False(t, ok, "expected stream to be closed")
 	})
 }
@@ -230,7 +231,7 @@ func TestFromStringWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream
+		_, ok := <-stream.c
 		assert.False(t, ok, "expected stream to be closed")
 	})
 }
@@ -260,7 +261,7 @@ func TestFromRunesWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream
+		_, ok := <-stream.c
 		assert.False(t, ok, "expected stream to be closed")
 	})
 }
@@ -292,7 +293,7 @@ func TestFromReaderWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream
+		_, ok := <-stream.c
 		assert.False(t, ok, "expected stream to be closed")
 	})
 }
@@ -312,6 +313,27 @@ func TestIota(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
+func TestIotaInvalidStep(t *testing.T) {
+	expected := []int{}
+
+	assert.Equal(t, expected, Iota(context.Background(), 0, 10, 0).Slice())
+	assert.Equal(t, expected, Iota(context.Background(), 0, 10, -1).Slice())
+}
+
+func TestIotaOverflow(t *testing.T) {
+	expected := []int{math.MaxInt - 2}
+	result := Iota(context.Background(), math.MaxInt-2, math.MaxInt, 3).Slice()
+
+	assert.Equal(t, expected, result)
+}
+
+func TestIotaOverflowFromMinInt(t *testing.T) {
+	expected := []int{math.MinInt, -1, math.MaxInt - 1}
+	result := Iota(context.Background(), math.MinInt, math.MaxInt, math.MaxInt).Take(10).Slice()
+
+	assert.Equal(t, expected, result)
+}
+
 func TestIotaWithContext(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -323,7 +345,7 @@ func TestIotaWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream
+		_, ok := <-stream.c
 		assert.False(t, ok, "expected stream to be closed")
 	})
 }
@@ -376,7 +398,7 @@ func TestFibonacciWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream
+		_, ok := <-stream.c
 		assert.False(t, ok, "expected stream to be closed")
 	})
 }
@@ -406,7 +428,7 @@ func TestPrimesWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream
+		_, ok := <-stream.c
 		assert.False(t, ok, "expected stream to be closed")
 	})
 }
@@ -436,7 +458,7 @@ func TestRandIntWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream
+		_, ok := <-stream.c
 		assert.False(t, ok, "expected stream to be closed")
 	})
 }
@@ -466,7 +488,7 @@ func TestRandFloat32WithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream
+		_, ok := <-stream.c
 		assert.False(t, ok, "expected stream to be closed")
 	})
 }
@@ -496,7 +518,7 @@ func TestRandFloat64WithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream
+		_, ok := <-stream.c
 		assert.False(t, ok, "expected stream to be closed")
 	})
 }

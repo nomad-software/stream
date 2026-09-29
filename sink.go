@@ -8,17 +8,17 @@ import (
 
 // Drain drains the main channel of all values and will return once the main
 // channel is closed.
-func (c Chan[T]) Drain() {
-	for range c {
+func (c Stream[T]) Drain() {
+	for range c.All() {
 	}
 }
 
 // Slice returns a slice containing the channel values once the main channel
 // closes.
-func (c Chan[T]) Slice() []T {
+func (c Stream[T]) Slice() []T {
 	output := make([]T, 0)
 
-	for val := range c {
+	for val := range c.All() {
 		output = append(output, val)
 	}
 
@@ -26,8 +26,8 @@ func (c Chan[T]) Slice() []T {
 }
 
 // Write writes the main channel values as bytes to the writer argument.
-func (c Chan[T]) Write(w io.Writer) error {
-	for v := range c {
+func (c Stream[T]) Write(w io.Writer) error {
+	for v := range c.All() {
 		switch val := any(v).(type) {
 		case int:
 			err := binary.Write(w, binary.LittleEndian, int64(val))
@@ -35,6 +35,9 @@ func (c Chan[T]) Write(w io.Writer) error {
 				return err
 			}
 		case *int:
+			if val == nil {
+				return fmt.Errorf("cannot write nil %T", val)
+			}
 			err := binary.Write(w, binary.LittleEndian, uint64(*val))
 			if err != nil {
 				return err
@@ -45,6 +48,9 @@ func (c Chan[T]) Write(w io.Writer) error {
 				return err
 			}
 		case *uint:
+			if val == nil {
+				return fmt.Errorf("cannot write nil %T", val)
+			}
 			err := binary.Write(w, binary.LittleEndian, uint64(*val))
 			if err != nil {
 				return err
@@ -55,6 +61,9 @@ func (c Chan[T]) Write(w io.Writer) error {
 				return err
 			}
 		case *string:
+			if val == nil {
+				return fmt.Errorf("cannot write nil %T", val)
+			}
 			err := binary.Write(w, binary.LittleEndian, []byte(*val))
 			if err != nil {
 				return err
@@ -69,10 +78,10 @@ func (c Chan[T]) Write(w io.Writer) error {
 	return nil
 }
 
-// String returns the string representation of the main channel values as a
+// ToString returns the string representation of the main channel values as a
 // slice. A specialisation exists for rune channels, returning their string
-// representation instead.
-func (c Chan[T]) String() string {
+// representation instead. This consumes the main channel.
+func (c Stream[T]) ToString() string {
 	slice := c.Slice()
 
 	switch val := any(slice).(type) {
@@ -86,12 +95,13 @@ func (c Chan[T]) String() string {
 }
 
 // Pop will return one value from the main channel.
-func (c Chan[T]) Pop() T {
-	return <-c
+func (c Stream[T]) Pop() T {
+	val, _ := c.recv()
+	return val
 }
 
 // Print will output the string representation of the main channel values to
 // stdout. This is useful for debugging.
-func (c Chan[T]) Print() {
-	fmt.Println(c.String())
+func (c Stream[T]) Print() {
+	fmt.Println(c.ToString())
 }
