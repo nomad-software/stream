@@ -388,7 +388,7 @@ func (c Stream[T]) Chunk(n int) chan Stream[T] {
 					}
 					return
 				}
-				chunk.c <- val
+				chunk.send(val)
 			}
 			chunk.close()
 			if !send(c.context(), output, chunk) {
@@ -469,7 +469,7 @@ func (c Stream[T]) Tail(n int) Stream[T] {
 			} else {
 				i++
 			}
-			tail <- val
+			send(c.ctx, tail, val)
 		}
 		if c.context().Err() != nil {
 			return
@@ -504,7 +504,7 @@ func (c Stream[T]) Zip(b Stream[T], args ...Stream[T]) chan Stream[T] {
 				if !ok {
 					return
 				}
-				zip.c <- val
+				zip.send(val)
 			}
 			zip.close()
 			if !send(c.context(), output, zip) {

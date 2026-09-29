@@ -12,6 +12,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestStreamComparable(t *testing.T) {
+	ctx := context.Background()
+
+	a := Iota(ctx, 1, 10, 1).Chunk(2)
+	b := Iota(ctx, 1, 10, 1).Chunk(2)
+
+	assert.NotEqual(t, a, b)
+	assert.True(t, a != b)
+
+	c := FromChannel(ctx, a)
+	d := FromChannel(ctx, b)
+
+	assert.NotEqual(t, c, d)
+	assert.True(t, c != d)
+}
+
 func TestTake(t *testing.T) {
 	expected := []int{1, 2, 3, 4, 5}
 	result := Iota(context.Background(), 1, 10, 1).Take(5).Slice()
