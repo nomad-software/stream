@@ -34,8 +34,7 @@ func TestFromSliceWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -71,8 +70,7 @@ func TestCycleWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -111,8 +109,7 @@ func TestGenerateWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -145,8 +142,7 @@ func TestRepeatWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -192,8 +188,7 @@ func TestFromChannelWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -231,8 +226,7 @@ func TestFromStringWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -261,8 +255,7 @@ func TestFromRunesWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -293,8 +286,7 @@ func TestFromReaderWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -345,8 +337,7 @@ func TestIotaWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -398,8 +389,7 @@ func TestFibonacciWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -428,8 +418,7 @@ func TestPrimesWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -458,8 +447,7 @@ func TestRandIntWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -488,8 +476,7 @@ func TestRandFloat32WithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -518,8 +505,7 @@ func TestRandFloat64WithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 

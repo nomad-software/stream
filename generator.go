@@ -6,225 +6,222 @@ import (
 	"math/big"
 	"math/rand"
 	"strings"
+	"unicode/utf8"
 )
 
-// FromSlice creates a channel that will return the items in the passed slice.
-// The channel will close when the slice values are exhausted.
-func FromSlice[T comparable](ctx context.Context, slice []T) Stream[T] {
-	output := newStream[T](ctx, 0)
+// fromSlice creates a stream, bound to a context with the passed done channel,
+// that will return the items in the passed slice.
+func fromSlice[T comparable](done <-chan struct{}, slice []T) Stream[T] {
+	i := 0
 
-	go output.run(func() {
-		for _, e := range slice {
-			if !output.send(e) {
-				return
-			}
+	return Stream[T]{done, func(done <-chan struct{}) (T, bool) {
+		if i >= len(slice) || cancelled(done) {
+			var zero T
+			return zero, false
 		}
-	})
-
-	return output
+		val := slice[i]
+		i++
+		return val, true
+	}}
 }
 
-// Cycle creates a channel that will repeat the items in the passed slice
-// infinitely. This channel will not close by itself and should be limited using
+// FromSlice creates a stream that will return the items in the passed slice.
+// The stream ends when the slice values are exhausted.
+func FromSlice[T comparable](ctx context.Context, slice []T) Stream[T] {
+	return fromSlice(ctx.Done(), slice)
+}
+
+// Cycle creates a stream that will repeat the items in the passed slice
+// infinitely. This stream will not end by itself and should be limited using
 // other methods.
 func Cycle[T comparable](ctx context.Context, slice []T) Stream[T] {
-	output := newStream[T](ctx, 0)
+	i := 0
 
-	go output.run(func() {
-		for i := 0; len(slice) > 0; i++ {
-			if i == len(slice) {
-				i = 0
-			}
-
-			if !output.send(slice[i]) {
-				return
-			}
+	return newStream(ctx, func(done <-chan struct{}) (T, bool) {
+		if len(slice) == 0 || cancelled(done) {
+			var zero T
+			return zero, false
 		}
+		val := slice[i]
+		i++
+		if i == len(slice) {
+			i = 0
+		}
+		return val, true
 	})
-
-	return output
 }
 
-// Generate creates a channel that will return values returned from the passed
-// function. This channel will not close by itself and should be limited using
+// Generate creates a stream that will return values returned from the passed
+// function. This stream will not end by itself and should be limited using
 // other methods.
 func Generate[T comparable](ctx context.Context, f func() T) Stream[T] {
-	output := newStream[T](ctx, 0)
-
-	go output.run(func() {
-		for {
-			if !output.send(f()) {
-				return
-			}
+	return newStream(ctx, func(done <-chan struct{}) (T, bool) {
+		if cancelled(done) {
+			var zero T
+			return zero, false
 		}
+		return f(), true
 	})
-
-	return output
 }
 
-// Repeat creates a channel that will repeat the passed value infinitely. This
-// channel will not close by itself and should be limited using other methods.
+// Repeat creates a stream that will repeat the passed value infinitely. This
+// stream will not end by itself and should be limited using other methods.
 func Repeat[T comparable](ctx context.Context, val T) Stream[T] {
-	output := newStream[T](ctx, 0)
-
-	go output.run(func() {
-		for {
-			if !output.send(val) {
-				return
-			}
+	return newStream(ctx, func(done <-chan struct{}) (T, bool) {
+		if cancelled(done) {
+			var zero T
+			return zero, false
 		}
+		return val, true
 	})
-
-	return output
 }
 
-// FromChannel creates a channel that will return the values of the passed
-// channel. The channel will close when passed channel is closed.
+// FromChannel creates a stream that will return the values of the passed
+// channel. The stream ends when the passed channel is closed.
 func FromChannel[T comparable](ctx context.Context, c <-chan T) Stream[T] {
-	output := newStream[T](ctx, 0)
-
-	go output.run(func() {
-		for {
+	return newStream(ctx, func(done <-chan struct{}) (T, bool) {
+		// The context is checked first because select chooses randomly when
+		// both a value and the cancellation are ready.
+		if !cancelled(done) {
 			select {
 			case val, ok := <-c:
-				if !ok {
-					return
-				}
-
-				if !output.send(val) {
-					return
-				}
-
-			case <-output.done:
-				return
+				return val, ok
+			case <-done:
 			}
 		}
+		var zero T
+		return zero, false
 	})
-
-	return output
 }
 
-// FromString creates a channel that will return strings delimited by a
-// separator. The channel will close when the strings are exhausted.
+// FromString creates a stream that will return strings delimited by a
+// separator. The stream ends when the strings are exhausted.
 func FromString(ctx context.Context, str string, sep string) Stream[string] {
-	output := newStream[string](ctx, 0)
+	// An empty separator splits the string into its UTF-8 sequences, of which
+	// an empty string has none.
+	finished := sep == "" && str == ""
 
-	go output.run(func() {
-		for val := range strings.SplitSeq(str, sep) {
-			if !output.send(val) {
-				return
-			}
+	return newStream(ctx, func(done <-chan struct{}) (string, bool) {
+		if finished || cancelled(done) {
+			return "", false
 		}
-	})
 
-	return output
+		var val string
+		if sep == "" {
+			_, size := utf8.DecodeRuneInString(str)
+			val, str = str[:size], str[size:]
+			finished = str == ""
+		} else if i := strings.Index(str, sep); i >= 0 {
+			val, str = str[:i], str[i+len(sep):]
+		} else {
+			val, finished = str, true
+		}
+		return val, true
+	})
 }
 
-// FromRunes creates a channel that will return the runes in the string. The
-// channel will close when the runes are exhausted.
+// FromRunes creates a stream that will return the runes in the string. The
+// stream ends when the runes are exhausted.
 func FromRunes(ctx context.Context, str string) Stream[rune] {
-	output := newStream[rune](ctx, 0)
-
-	go output.run(func() {
-		for _, r := range str {
-			if !output.send(r) {
-				return
-			}
+	return newStream(ctx, func(done <-chan struct{}) (rune, bool) {
+		if str == "" || cancelled(done) {
+			return 0, false
 		}
+		r, size := utf8.DecodeRuneInString(str)
+		str = str[size:]
+		return r, true
 	})
-
-	return output
 }
 
-// FromReader creates a byte channel returning bytes read from the passed reader.
-// The channel will close when the reader returns an error. This error could be
-// a EOF indicating the data has been exhausted or any other error.
+// FromReader creates a byte stream returning bytes read from the passed reader.
+// The stream ends when the reader returns an error. This error could be a EOF
+// indicating the data has been exhausted or any other error. Bytes are read
+// from the reader a page at a time, so more may be read than are consumed.
 func FromReader(ctx context.Context, r io.Reader) Stream[byte] {
-	output := newStream[byte](ctx, 0)
-	buffer := make([]byte, 4096) // Default page size.
+	var buffer []byte
+	var pending []byte // The bytes that have been read but not returned.
+	finished := false
 
-	go output.run(func() {
-		for {
+	return newStream(ctx, func(done <-chan struct{}) (byte, bool) {
+		if cancelled(done) {
+			return 0, false
+		}
+		for len(pending) == 0 {
+			if finished {
+				return 0, false
+			}
+			if buffer == nil {
+				buffer = make([]byte, 4096) // Default page size.
+			}
 			n, err := r.Read(buffer)
-
-			for i := range n {
-				if !output.send(buffer[i]) {
-					return
-				}
-			}
-
-			if err != nil {
-				return
-			}
+			pending = buffer[:n]
+			finished = err != nil
 		}
+		b := pending[0]
+		pending = pending[1:]
+		return b, true
 	})
-
-	return output
 }
 
-// Iota creates a channel that will return integers from start (inclusive) to
-// end (exclusive), incremented by step. The channel will close when end is
-// reached or when the sequence exceeds the channel's type limits.
+// Iota creates a stream that will return integers from start (inclusive) to
+// end (exclusive), incremented by step. The stream ends when end is reached or
+// when the sequence exceeds the type limits.
 func Iota(ctx context.Context, start, end, step int) Stream[int] {
-	output := newStream[int](ctx, 0)
+	i := start
+	finished := step <= 0 || start >= end
 
-	if step <= 0 {
-		output.close()
-		return output
-	}
-
-	go output.run(func() {
-		for i := start; i < end; i += step {
-			if !output.send(i) {
-				return
-			}
-			// Stop if the next value would reach the end, before adding the
-			// step can overflow. The distance is compared as unsigned because
-			// it can exceed the int range.
-			if uint(end)-uint(i) <= uint(step) {
-				return
-			}
+	return newStream(ctx, func(done <-chan struct{}) (int, bool) {
+		if finished || cancelled(done) {
+			return 0, false
 		}
+		val := i
+		// Stop if the next value would reach the end, before adding the step
+		// can overflow. The distance is compared as unsigned because it can
+		// exceed the int range.
+		if uint(end)-uint(i) <= uint(step) {
+			finished = true
+		} else {
+			i += step
+		}
+		return val, true
 	})
-
-	return output
 }
 
-// Fibonacci creates an integer channel returning the fibonacci sequence. This
-// channel will not close by itself and should be limited using other methods.
+// Fibonacci creates an integer stream returning the fibonacci sequence. This
+// stream will not end by itself and should be limited using other methods.
 func Fibonacci(ctx context.Context) Stream[*big.Int] {
-	output := newStream[*big.Int](ctx, 0)
+	a := big.NewInt(0)
+	b := big.NewInt(1)
 
-	go output.run(func() {
-		a := big.NewInt(0)
-		b := big.NewInt(1)
-
-		for {
-			if !output.send(big.NewInt(0).Set(a.Add(a, b))) {
-				return
-			}
-			a, b = b, a
+	return newStream(ctx, func(done <-chan struct{}) (*big.Int, bool) {
+		if cancelled(done) {
+			return nil, false
 		}
+		val := big.NewInt(0).Set(a.Add(a, b))
+		a, b = b, a
+		return val, true
 	})
-
-	return output
 }
 
-// Primes creates an integer channel returning prime numbers. The channel will
-// close when the sequence exceeds the returned channel's type limits which may
-// take a long time.
+// Primes creates an integer stream returning prime numbers. The stream ends
+// when the sequence exceeds the type limits which may take a long time.
 func Primes(ctx context.Context) Stream[int] {
-	output := newStream[int](ctx, 0)
+	// The odd primes found so far and the next candidate. A candidate of one
+	// means two hasn't been returned yet.
+	primes := make([]int, 0, 64)
+	n := 1
 
-	go output.run(func() {
-		if !output.send(2) {
-			return
+	return newStream(ctx, func(done <-chan struct{}) (int, bool) {
+		if cancelled(done) {
+			return 0, false
 		}
 
-		// The odd primes found so far.
-		primes := make([]int, 0, 64)
+		if n == 1 {
+			n = 3
+			return 2, true
+		}
 
-		for n := 3; n > 0; n += 2 {
+		for ; n > 0; n += 2 {
 			isPrime := true
 
 			for _, prime := range primes {
@@ -240,61 +237,31 @@ func Primes(ctx context.Context) Stream[int] {
 			}
 
 			if isPrime {
-				if !output.send(n) {
-					return
-				}
-				primes = append(primes, n)
+				prime := n
+				primes = append(primes, prime)
+				n += 2
+				return prime, true
 			}
 		}
-	})
 
-	return output
+		return 0, false
+	})
 }
 
-// RandInt creates an integer channel returning random integers. This channel
-// will not close by itself and should be limited using other methods.
+// RandInt creates an integer stream returning random integers. This stream
+// will not end by itself and should be limited using other methods.
 func RandInt(ctx context.Context) Stream[int] {
-	output := newStream[int](ctx, 0)
-
-	go output.run(func() {
-		for {
-			if !output.send(rand.Int()) {
-				return
-			}
-		}
-	})
-
-	return output
+	return Generate(ctx, rand.Int)
 }
 
-// RandFloat32 creates a (32bit) float channel returning random floats. This
-// channel will not close by itself and should be limited using other methods.
+// RandFloat32 creates a (32bit) float stream returning random floats. This
+// stream will not end by itself and should be limited using other methods.
 func RandFloat32(ctx context.Context) Stream[float32] {
-	output := newStream[float32](ctx, 0)
-
-	go output.run(func() {
-		for {
-			if !output.send(rand.Float32()) {
-				return
-			}
-		}
-	})
-
-	return output
+	return Generate(ctx, rand.Float32)
 }
 
-// RandFloat64 creates a (64bit) float channel returning random floats. This
-// channel will not close by itself and should be limited using other methods.
+// RandFloat64 creates a (64bit) float stream returning random floats. This
+// stream will not end by itself and should be limited using other methods.
 func RandFloat64(ctx context.Context) Stream[float64] {
-	output := newStream[float64](ctx, 0)
-
-	go output.run(func() {
-		for {
-			if !output.send(rand.Float64()) {
-				return
-			}
-		}
-	})
-
-	return output
+	return Generate(ctx, rand.Float64)
 }

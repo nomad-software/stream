@@ -1,4 +1,4 @@
-module github.com/nomad-software/stream
+module github.com/nomad-software/stream/v2
 
 go 1.27
 

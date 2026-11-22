@@ -12,20 +12,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStreamComparable(t *testing.T) {
-	ctx := context.Background()
+func TestZeroValue(t *testing.T) {
+	var stream Stream[int]
 
-	a := Iota(ctx, 1, 10, 1).Chunk(2)
-	b := Iota(ctx, 1, 10, 1).Chunk(2)
-
-	assert.NotEqual(t, a, b)
-	assert.True(t, a != b)
-
-	c := FromChannel(ctx, a)
-	d := FromChannel(ctx, b)
-
-	assert.NotEqual(t, c, d)
-	assert.True(t, c != d)
+	assert.Equal(t, []int{}, stream.Slice())
+	assert.Equal(t, 0, stream.Pop())
+	assert.Equal(t, []int{}, stream.Map(func(n int) int { return n + 1 }).Slice())
+	assert.Equal(t, []int{1, 2}, stream.Chain(FromSlice(context.Background(), []int{1, 2})).Slice())
 }
 
 func TestTake(t *testing.T) {
@@ -60,8 +53,7 @@ func TestTakeWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -105,8 +97,7 @@ func TestUntilWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -154,8 +145,7 @@ func TestMapWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -206,8 +196,7 @@ func TestMapParallelWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -258,8 +247,7 @@ func TestFilterWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -289,8 +277,7 @@ func TestReduceEmpty(t *testing.T) {
 }
 
 func TestReduceWithContext(t *testing.T) {
-	// Repeated because select chooses randomly between a waiting reader and a
-	// cancelled context.
+	// Repeated to catch a value being returned only some of the time.
 	for range 100 {
 		synctest.Test(t, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -307,8 +294,7 @@ func TestReduceWithContext(t *testing.T) {
 
 			received := make(chan bool)
 			go func() {
-				_, ok := <-stream.c
-				received <- ok
+				received <- len(stream.Slice()) > 0
 			}()
 			synctest.Wait()
 
@@ -345,8 +331,7 @@ func TestLastEmpty(t *testing.T) {
 }
 
 func TestLastWithContext(t *testing.T) {
-	// Repeated because select chooses randomly between a waiting reader and a
-	// cancelled context.
+	// Repeated to catch a value being returned only some of the time.
 	for range 100 {
 		synctest.Test(t, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -363,8 +348,7 @@ func TestLastWithContext(t *testing.T) {
 
 			received := make(chan bool)
 			go func() {
-				_, ok := <-stream.c
-				received <- ok
+				received <- len(stream.Slice()) > 0
 			}()
 			synctest.Wait()
 
@@ -421,8 +405,7 @@ func TestChainWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -558,8 +541,7 @@ func TestRoundRobinWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -587,13 +569,11 @@ func TestChunk(t *testing.T) {
 func TestChunkZero(t *testing.T) {
 	result := Iota(context.Background(), 2, 12, 2).Chunk(0)
 
-	_, ok := <-result
-	assert.False(t, ok, "expected channel to be closed")
+	assert.Empty(t, slices.Collect(result), "expected no chunks")
 }
 
 func TestChunkWithContext(t *testing.T) {
-	// Repeated because select chooses randomly between a waiting reader and a
-	// cancelled context.
+	// Repeated to catch a value being returned only some of the time.
 	for range 100 {
 		synctest.Test(t, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -610,8 +590,7 @@ func TestChunkWithContext(t *testing.T) {
 
 			received := make(chan bool)
 			go func() {
-				_, ok := <-stream
-				received <- ok
+				received <- len(slices.Collect(stream)) > 0
 			}()
 			synctest.Wait()
 
@@ -658,8 +637,7 @@ func TestDropWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -695,8 +673,7 @@ func TestStrideWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -722,8 +699,7 @@ func TestTailZero(t *testing.T) {
 }
 
 func TestTailWithContext(t *testing.T) {
-	// Repeated because select chooses randomly between a waiting reader and a
-	// cancelled context.
+	// Repeated to catch a value being returned only some of the time.
 	for range 100 {
 		synctest.Test(t, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -740,8 +716,7 @@ func TestTailWithContext(t *testing.T) {
 
 			received := make(chan bool)
 			go func() {
-				_, ok := <-stream.c
-				received <- ok
+				received <- len(stream.Slice()) > 0
 			}()
 			synctest.Wait()
 
@@ -847,8 +822,7 @@ func TestZipWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, slices.Collect(stream), "expected stream to be stopped")
 	})
 }
 
@@ -882,8 +856,7 @@ func TestPadRightExceeded(t *testing.T) {
 }
 
 func TestPadRightWithContext(t *testing.T) {
-	// Repeated because select chooses randomly between a waiting reader and a
-	// cancelled context.
+	// Repeated to catch a value being returned only some of the time.
 	for range 100 {
 		synctest.Test(t, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -895,8 +868,7 @@ func TestPadRightWithContext(t *testing.T) {
 
 			received := make(chan bool)
 			go func() {
-				_, ok := <-stream.c
-				received <- ok
+				received <- len(stream.Slice()) > 0
 			}()
 			synctest.Wait()
 
@@ -946,8 +918,7 @@ func TestPadLeftLarge(t *testing.T) {
 }
 
 func TestPadLeftWithContext(t *testing.T) {
-	// Repeated because select chooses randomly between a waiting reader and a
-	// cancelled context.
+	// Repeated to catch a value being returned only some of the time.
 	for range 100 {
 		synctest.Test(t, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -964,8 +935,7 @@ func TestPadLeftWithContext(t *testing.T) {
 
 			received := make(chan bool)
 			go func() {
-				_, ok := <-stream.c
-				received <- ok
+				received <- len(stream.Slice()) > 0
 			}()
 			synctest.Wait()
 
@@ -1003,8 +973,7 @@ func TestTeeWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -1044,13 +1013,15 @@ func TestEnumerateWithContext(t *testing.T) {
 
 		stream := Repeat(ctx, "Lorem").Enumerate(1)
 
-		assert.Equal(t, Enum[string]{Index: 1, Val: "Lorem"}, <-stream)
+		for val := range stream {
+			assert.Equal(t, Enum[string]{Index: 1, Val: "Lorem"}, val)
+			break
+		}
 
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, slices.Collect(stream), "expected stream to be stopped")
 	})
 }
 
@@ -1086,8 +1057,7 @@ func TestFindWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -1116,8 +1086,7 @@ func TestSubstituteWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -1146,8 +1115,7 @@ func TestSkipWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -1203,8 +1171,7 @@ func TestThrottleWithContext(t *testing.T) {
 
 		start := time.Now()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 		assert.Equal(t, start, time.Now(), "expected stream to close without waiting")
 	})
 }
@@ -1249,8 +1216,7 @@ func TestDistinctWithContext(t *testing.T) {
 		cancel()
 		synctest.Wait()
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
@@ -1265,15 +1231,19 @@ func TestBuffer(t *testing.T) {
 	count := 0
 
 	synctest.Test(t, func(*testing.T) {
-		FromSlice(context.Background(), []int{1, 2, 3, 4, 5}).
+		stream := Iota(context.Background(), 1, 100, 1).
 			Tee(func(val int) {
 				count++
 			}).
 			Buffer(5)
 
+		assert.Equal(t, 0, count, "expected nothing to run until a value is asked for")
+		assert.Equal(t, 1, stream.Pop())
 		synctest.Wait()
 
-		assert.Equal(t, 5, count)
+		// One received, five buffered and one waiting to be buffered.
+		assert.Equal(t, 7, count)
+		assert.Equal(t, 99, len(stream.Slice())+1)
 	})
 }
 
@@ -1288,40 +1258,36 @@ func TestBufferWithContext(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 
+		// The buffer starts filling when the first value is asked for.
 		stream := Repeat(ctx, 1).Buffer(2)
+		assert.Equal(t, 1, stream.Pop())
 		synctest.Wait()
 
 		cancel()
 		synctest.Wait()
 
 		// Values already buffered are still received.
-		assert.Equal(t, 1, <-stream.c)
-		assert.Equal(t, 1, <-stream.c)
+		assert.Equal(t, 1, stream.Pop())
+		assert.Equal(t, 1, stream.Pop())
 
-		_, ok := <-stream.c
-		assert.False(t, ok, "expected stream to be closed")
+		assert.Empty(t, stream.Slice(), "expected stream to be stopped")
 	})
 }
 
 func ExampleStream_Buffer() {
-	t := &testing.T{}
+	FromSlice(context.Background(), []int{1, 2, 3, 4, 5}).
+		Tee(func(val int) {
+			fmt.Println(val)
+		}).
+		Buffer(5).
+		Drain()
 
-	synctest.Test(t, func(t *testing.T) {
-		FromSlice(context.Background(), []int{1, 2, 3, 4, 5}).
-			Tee(func(val int) {
-				fmt.Println(val)
-			}).
-			Buffer(5)
-
-		synctest.Wait()
-
-		// Output:
-		// 1
-		// 2
-		// 3
-		// 4
-		// 5
-	})
+	// Output:
+	// 1
+	// 2
+	// 3
+	// 4
+	// 5
 }
 
 func TestNotStringer(t *testing.T) {

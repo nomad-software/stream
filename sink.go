@@ -7,15 +7,15 @@ import (
 	"math"
 )
 
-// Drain drains the main channel of all values and will return once the main
-// channel is closed.
+// Drain consumes all of the stream's values and will return once the stream
+// is exhausted.
 func (c Stream[T]) Drain() {
 	for range c.All() {
 	}
 }
 
-// Slice returns a slice containing the channel values once the main channel
-// closes.
+// Slice returns a slice containing the stream's remaining values once the
+// stream is exhausted.
 func (c Stream[T]) Slice() []T {
 	output := make([]T, 0)
 
@@ -26,7 +26,7 @@ func (c Stream[T]) Slice() []T {
 	return output
 }
 
-// Write writes the main channel values as bytes to the writer argument.
+// Write writes the stream values as bytes to the writer argument.
 func (c Stream[T]) Write(w io.Writer) error {
 	write := writer[T](w)
 
@@ -112,9 +112,9 @@ func writer[T comparable](w io.Writer) func(T) error {
 	return write
 }
 
-// ToString returns the string representation of the main channel values as a
-// slice. A specialisation exists for rune channels, returning their string
-// representation instead. This consumes the main channel.
+// ToString returns the string representation of the stream values as a slice.
+// A specialisation exists for rune streams, returning their string
+// representation instead. This consumes the stream.
 func (c Stream[T]) ToString() string {
 	slice := c.Slice()
 
@@ -128,13 +128,14 @@ func (c Stream[T]) ToString() string {
 
 }
 
-// Pop will return one value from the main channel.
+// Pop will return the next value of the stream, or the zero value if the
+// stream is exhausted.
 func (c Stream[T]) Pop() T {
-	val, _ := c.recv()
+	val, _ := c.source()(c.done)
 	return val
 }
 
-// Print will output the string representation of the main channel values to
+// Print will output the string representation of the stream values to
 // stdout. This is useful for debugging.
 func (c Stream[T]) Print() {
 	fmt.Println(c.ToString())
