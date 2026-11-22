@@ -13,15 +13,13 @@ import (
 func FromSlice[T comparable](ctx context.Context, slice []T) Stream[T] {
 	output := newStream[T](ctx, 0)
 
-	go func() {
-		defer output.close()
-
+	go output.run(func() {
 		for _, e := range slice {
 			if !output.send(e) {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -32,9 +30,7 @@ func FromSlice[T comparable](ctx context.Context, slice []T) Stream[T] {
 func Cycle[T comparable](ctx context.Context, slice []T) Stream[T] {
 	output := newStream[T](ctx, 0)
 
-	go func() {
-		defer output.close()
-
+	go output.run(func() {
 		for i := 0; len(slice) > 0; i++ {
 			if i == len(slice) {
 				i = 0
@@ -44,7 +40,7 @@ func Cycle[T comparable](ctx context.Context, slice []T) Stream[T] {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -55,15 +51,13 @@ func Cycle[T comparable](ctx context.Context, slice []T) Stream[T] {
 func Generate[T comparable](ctx context.Context, f func() T) Stream[T] {
 	output := newStream[T](ctx, 0)
 
-	go func() {
-		defer output.close()
-
+	go output.run(func() {
 		for {
 			if !output.send(f()) {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -73,15 +67,13 @@ func Generate[T comparable](ctx context.Context, f func() T) Stream[T] {
 func Repeat[T comparable](ctx context.Context, val T) Stream[T] {
 	output := newStream[T](ctx, 0)
 
-	go func() {
-		defer output.close()
-
+	go output.run(func() {
 		for {
 			if !output.send(val) {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -91,9 +83,7 @@ func Repeat[T comparable](ctx context.Context, val T) Stream[T] {
 func FromChannel[T comparable](ctx context.Context, c <-chan T) Stream[T] {
 	output := newStream[T](ctx, 0)
 
-	go func() {
-		defer output.close()
-
+	go output.run(func() {
 		for {
 			select {
 			case val, ok := <-c:
@@ -105,11 +95,11 @@ func FromChannel[T comparable](ctx context.Context, c <-chan T) Stream[T] {
 					return
 				}
 
-			case <-ctx.Done():
+			case <-output.done:
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -119,15 +109,13 @@ func FromChannel[T comparable](ctx context.Context, c <-chan T) Stream[T] {
 func FromString(ctx context.Context, str string, sep string) Stream[string] {
 	output := newStream[string](ctx, 0)
 
-	go func() {
-		defer output.close()
-
-		for _, val := range strings.Split(str, sep) {
+	go output.run(func() {
+		for val := range strings.SplitSeq(str, sep) {
 			if !output.send(val) {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -137,15 +125,13 @@ func FromString(ctx context.Context, str string, sep string) Stream[string] {
 func FromRunes(ctx context.Context, str string) Stream[rune] {
 	output := newStream[rune](ctx, 0)
 
-	go func() {
-		defer output.close()
-
+	go output.run(func() {
 		for _, r := range str {
 			if !output.send(r) {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -157,9 +143,7 @@ func FromReader(ctx context.Context, r io.Reader) Stream[byte] {
 	output := newStream[byte](ctx, 0)
 	buffer := make([]byte, 4096) // Default page size.
 
-	go func() {
-		defer output.close()
-
+	go output.run(func() {
 		for {
 			n, err := r.Read(buffer)
 
@@ -173,7 +157,7 @@ func FromReader(ctx context.Context, r io.Reader) Stream[byte] {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -189,9 +173,7 @@ func Iota(ctx context.Context, start, end, step int) Stream[int] {
 		return output
 	}
 
-	go func() {
-		defer output.close()
-
+	go output.run(func() {
 		for i := start; i < end; i += step {
 			if !output.send(i) {
 				return
@@ -203,7 +185,7 @@ func Iota(ctx context.Context, start, end, step int) Stream[int] {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -213,9 +195,7 @@ func Iota(ctx context.Context, start, end, step int) Stream[int] {
 func Fibonacci(ctx context.Context) Stream[*big.Int] {
 	output := newStream[*big.Int](ctx, 0)
 
-	go func() {
-		defer output.close()
-
+	go output.run(func() {
 		a := big.NewInt(0)
 		b := big.NewInt(1)
 
@@ -225,7 +205,7 @@ func Fibonacci(ctx context.Context) Stream[*big.Int] {
 			}
 			a, b = b, a
 		}
-	}()
+	})
 
 	return output
 }
@@ -236,19 +216,23 @@ func Fibonacci(ctx context.Context) Stream[*big.Int] {
 func Primes(ctx context.Context) Stream[int] {
 	output := newStream[int](ctx, 0)
 
-	go func() {
-		defer output.close()
-
+	go output.run(func() {
 		if !output.send(2) {
 			return
 		}
 
-		primes := make([]int, 0)
+		// The odd primes found so far.
+		primes := make([]int, 0, 64)
 
 		for n := 3; n > 0; n += 2 {
 			isPrime := true
 
 			for _, prime := range primes {
+				// A composite number has a prime factor no larger than its
+				// square root. The square is unsigned so it cannot overflow.
+				if uint(prime)*uint(prime) > uint(n) {
+					break
+				}
 				if n%prime == 0 {
 					isPrime = false
 					break
@@ -262,7 +246,7 @@ func Primes(ctx context.Context) Stream[int] {
 				primes = append(primes, n)
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -272,15 +256,13 @@ func Primes(ctx context.Context) Stream[int] {
 func RandInt(ctx context.Context) Stream[int] {
 	output := newStream[int](ctx, 0)
 
-	go func() {
-		defer output.close()
-
+	go output.run(func() {
 		for {
 			if !output.send(rand.Int()) {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -290,15 +272,13 @@ func RandInt(ctx context.Context) Stream[int] {
 func RandFloat32(ctx context.Context) Stream[float32] {
 	output := newStream[float32](ctx, 0)
 
-	go func() {
-		defer output.close()
-
+	go output.run(func() {
 		for {
 			if !output.send(rand.Float32()) {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -308,15 +288,13 @@ func RandFloat32(ctx context.Context) Stream[float32] {
 func RandFloat64(ctx context.Context) Stream[float64] {
 	output := newStream[float64](ctx, 0)
 
-	go func() {
-		defer output.close()
-
+	go output.run(func() {
 		for {
 			if !output.send(rand.Float64()) {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }

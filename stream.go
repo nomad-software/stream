@@ -13,8 +13,9 @@ import (
 // Streams should be created using a generator. The zero value behaves like a nil
 // channel and blocks forever.
 type Stream[T comparable] struct {
-	ctx context.Context
-	c   chan T
+	ctx  context.Context
+	done <-chan struct{} // ctx.Done(), cached because it's read for every value.
+	c    chan T
 }
 
 // Enum adds an enumeration index to a value.
@@ -23,12 +24,27 @@ type Enum[T comparable] struct {
 	Val   T   `json:"val"`
 }
 
+// Passing a value between two goroutines is by far the most expensive thing a
+// stream does, so the stages avoid selecting on the context for every value.
+// Instead:
+//
+//   - A stage sends with a plain channel send. If the context is cancelled
+//     while it's blocked, a function registered with the context drains the
+//     channel, which unblocks the send. The stage then sees the cancellation
+//     and stops.
+//   - A stage receives from its input with a plain channel receive. Its input
+//     shares its context, so the input is closed when the context is cancelled.
+//   - Anything that hands values to the caller (All, Pop, Chunk, Zip, Enumerate)
+//     or reads a stream bound to another context still selects on the context,
+//     so the caller is never left waiting on a stage that's stuck in a callback.
+
 // newStream creates a stream bound to the passed context with a buffer of the
 // passed size.
 func newStream[T comparable](ctx context.Context, size int) Stream[T] {
 	return Stream[T]{
-		ctx: ctx,
-		c:   make(chan T, size),
+		ctx:  ctx,
+		done: ctx.Done(),
+		c:    make(chan T, size),
 	}
 }
 
@@ -41,45 +57,92 @@ func (c Stream[T]) context() context.Context {
 	return c.ctx
 }
 
-// withContext returns the same stream bound to the passed context.
-func (c Stream[T]) withContext(ctx context.Context) Stream[T] {
-	c.ctx = ctx
-	return c
-}
-
-// send sends a value to a channel. It returns false if the context was
-// cancelled before the value could be sent.
-func send[T any](ctx context.Context, c chan<- T, val T) bool {
+// cancelled returns true if the passed done channel is closed. A nil channel
+// is never cancelled.
+func cancelled(done <-chan struct{}) bool {
 	select {
-	case c <- val:
+	case <-done:
 		return true
-	case <-ctx.Done():
+	default:
 		return false
 	}
 }
 
-// recv receives a value from a channel. It returns false if the channel was
-// closed or the context was cancelled.
-func recv[T any](ctx context.Context, c <-chan T) (T, bool) {
-	select {
-	case val, ok := <-c:
-		return val, ok
-	case <-ctx.Done():
-		var zero T
-		return zero, false
+// run calls the passed function, which is expected to send values to the
+// passed channel, and closes the channel when the function returns. While the
+// function is running, cancelling the context drains the channel so sends to
+// it cannot block.
+func run[T any](ctx context.Context, done <-chan struct{}, c chan T, f func()) {
+	if done != nil {
+		stop := context.AfterFunc(ctx, func() {
+			for range c {
+			}
+		})
+		defer stop()
 	}
+	defer close(c)
+	f()
+}
+
+// run calls the passed function, which is expected to send values to the
+// stream, and closes the stream when the function returns.
+func (c Stream[T]) run(f func()) {
+	run(c.ctx, c.done, c.c, f)
 }
 
 // send sends a value to the stream. It returns false if the stream's context
-// was cancelled before the value could be sent.
+// has been cancelled, in which case the stage must stop. It must only be called
+// from within the function passed to run.
 func (c Stream[T]) send(val T) bool {
-	return send(c.context(), c.c, val)
+	c.c <- val
+	return !cancelled(c.done)
 }
 
 // recv receives a value from the stream. It returns false if the stream was
 // closed or the stream's context was cancelled.
 func (c Stream[T]) recv() (T, bool) {
-	return recv(c.context(), c.c)
+	return recv(c.done, c.c)
+}
+
+// recv receives a value from a channel. It returns false if the channel was
+// closed or the passed done channel was closed.
+func recv[T any](done <-chan struct{}, c <-chan T) (T, bool) {
+	if done == nil {
+		val, ok := <-c
+		return val, ok
+	}
+	select {
+	case val, ok := <-c:
+		return val, ok
+	case <-done:
+		var zero T
+		return zero, false
+	}
+}
+
+// recvIn receives a value from the stream on behalf of a stage whose context
+// has the passed done channel. It returns false if the stream was closed or
+// that context was cancelled.
+func (c Stream[T]) recvIn(done <-chan struct{}) (T, bool) {
+	if done == c.done {
+		// The stream is closed when the context is cancelled.
+		val, ok := <-c.c
+		return val, ok
+	}
+	return recv(done, c.c)
+}
+
+// in returns an iterator over the stream's values on behalf of a stage whose
+// context has the passed done channel.
+func (c Stream[T]) in(done <-chan struct{}) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for {
+			val, ok := c.recvIn(done)
+			if !ok || !yield(val) {
+				return
+			}
+		}
+	}
 }
 
 // close closes the stream.
@@ -91,12 +154,17 @@ func (c Stream[T]) close() {
 // the main channel is closed or its context is cancelled.
 func (c Stream[T]) All() iter.Seq[T] {
 	return func(yield func(T) bool) {
+		if c.done == nil {
+			for val := range c.c {
+				if !yield(val) {
+					return
+				}
+			}
+			return
+		}
 		for {
 			val, ok := c.recv()
-			if !ok {
-				return
-			}
-			if !yield(val) {
+			if !ok || !yield(val) {
 				return
 			}
 		}
@@ -107,10 +175,9 @@ func (c Stream[T]) All() iter.Seq[T] {
 func (c Stream[T]) Take(n int) Stream[T] {
 	output := newStream[T](c.context(), 0)
 
-	go func() {
-		defer output.close()
+	go output.run(func() {
 		for range n {
-			val, ok := c.recv()
+			val, ok := <-c.c
 			if !ok {
 				return
 			}
@@ -118,7 +185,7 @@ func (c Stream[T]) Take(n int) Stream[T] {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -128,9 +195,8 @@ func (c Stream[T]) Take(n int) Stream[T] {
 func (c Stream[T]) Until(f func(T) bool) Stream[T] {
 	output := newStream[T](c.context(), 0)
 
-	go func() {
-		defer output.close()
-		for val := range c.All() {
+	go output.run(func() {
+		for val := range c.c {
 			if f(val) {
 				return
 			}
@@ -138,7 +204,7 @@ func (c Stream[T]) Until(f func(T) bool) Stream[T] {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -148,14 +214,13 @@ func (c Stream[T]) Until(f func(T) bool) Stream[T] {
 func (c Stream[T]) Map[R comparable](f func(T) R) Stream[R] {
 	output := newStream[R](c.context(), 0)
 
-	go func() {
-		defer output.close()
-		for val := range c.All() {
+	go output.run(func() {
+		for val := range c.c {
 			if !output.send(f(val)) {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -177,7 +242,7 @@ func (c Stream[T]) MapParallel[R comparable](workers int, f func(T) R) Stream[R]
 	for range workers {
 		go func() {
 			defer wg.Done()
-			for val := range c.All() {
+			for val := range c.c {
 				if !output.send(f(val)) {
 					return
 				}
@@ -185,10 +250,7 @@ func (c Stream[T]) MapParallel[R comparable](workers int, f func(T) R) Stream[R]
 		}()
 	}
 
-	go func() {
-		wg.Wait()
-		output.close()
-	}()
+	go output.run(wg.Wait)
 
 	return output
 }
@@ -198,9 +260,8 @@ func (c Stream[T]) MapParallel[R comparable](workers int, f func(T) R) Stream[R]
 func (c Stream[T]) Filter(f func(T) bool) Stream[T] {
 	output := newStream[T](c.context(), 0)
 
-	go func() {
-		defer output.close()
-		for val := range c.All() {
+	go output.run(func() {
+		for val := range c.c {
 			if !f(val) {
 				continue
 			}
@@ -208,7 +269,7 @@ func (c Stream[T]) Filter(f func(T) bool) Stream[T] {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -218,21 +279,20 @@ func (c Stream[T]) Filter(f func(T) bool) Stream[T] {
 func (c Stream[T]) Reduce(f func(T, T) T) Stream[T] {
 	output := newStream[T](c.context(), 0)
 
-	go func() {
-		defer output.close()
+	go output.run(func() {
 
-		a, ok := c.recv()
+		a, ok := <-c.c
 		if !ok {
 			return
 		}
-		for val := range c.All() {
+		for val := range c.c {
 			a = f(a, val)
 		}
 		if c.context().Err() != nil {
 			return
 		}
 		output.send(a)
-	}()
+	})
 
 	return output
 }
@@ -241,20 +301,19 @@ func (c Stream[T]) Reduce(f func(T, T) T) Stream[T] {
 func (c Stream[T]) Last() Stream[T] {
 	output := newStream[T](c.context(), 0)
 
-	go func() {
-		defer output.close()
-		last, ok := c.recv()
+	go output.run(func() {
+		last, ok := <-c.c
 		if !ok {
 			return
 		}
-		for val := range c.All() {
+		for val := range c.c {
 			last = val
 		}
 		if c.context().Err() != nil {
 			return
 		}
 		output.send(last)
-	}()
+	})
 
 	return output
 }
@@ -264,26 +323,25 @@ func (c Stream[T]) Last() Stream[T] {
 func (c Stream[T]) Chain(b Stream[T], args ...Stream[T]) Stream[T] {
 	output := newStream[T](c.context(), 0)
 
-	go func() {
-		defer output.close()
-		for val := range c.All() {
+	go output.run(func() {
+		for val := range c.c {
 			if !output.send(val) {
 				return
 			}
 		}
-		for val := range b.withContext(c.context()).All() {
+		for val := range b.in(c.done) {
 			if !output.send(val) {
 				return
 			}
 		}
 		for _, arg := range args {
-			for val := range arg.withContext(c.context()).All() {
+			for val := range arg.in(c.done) {
 				if !output.send(val) {
 					return
 				}
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -294,11 +352,11 @@ func (c Stream[T]) Merge(b Stream[T], args ...Stream[T]) Stream[T] {
 	output := newStream[T](c.context(), 0)
 
 	wg := new(sync.WaitGroup)
-	wg.Add(2+len(args))
+	wg.Add(2 + len(args))
 
 	go func() {
 		defer wg.Done()
-		for val := range c.All() {
+		for val := range c.c {
 			if !output.send(val) {
 				return
 			}
@@ -307,7 +365,7 @@ func (c Stream[T]) Merge(b Stream[T], args ...Stream[T]) Stream[T] {
 
 	go func() {
 		defer wg.Done()
-		for val := range b.withContext(c.context()).All() {
+		for val := range b.in(c.done) {
 			if !output.send(val) {
 				return
 			}
@@ -317,7 +375,7 @@ func (c Stream[T]) Merge(b Stream[T], args ...Stream[T]) Stream[T] {
 	for _, arg := range args {
 		go func() {
 			defer wg.Done()
-			for val := range arg.withContext(c.context()).All() {
+			for val := range arg.in(c.done) {
 				if !output.send(val) {
 					return
 				}
@@ -325,10 +383,7 @@ func (c Stream[T]) Merge(b Stream[T], args ...Stream[T]) Stream[T] {
 		}()
 	}
 
-	go func() {
-		wg.Wait()
-		output.close()
-	}()
+	go output.run(wg.Wait)
 
 	return output
 }
@@ -337,17 +392,13 @@ func (c Stream[T]) Merge(b Stream[T], args ...Stream[T]) Stream[T] {
 // channels, in order. The main channel's context is used for all channels.
 func (c Stream[T]) RoundRobin(b Stream[T], args ...Stream[T]) Stream[T] {
 	output := newStream[T](c.context(), 0)
-	inputs := []Stream[T]{c, b.withContext(c.context())}
-	for _, arg := range args {
-		inputs = append(inputs, arg.withContext(c.context()))
-	}
+	inputs := append([]Stream[T]{c, b}, args...)
 
-	go func() {
-		defer output.close()
+	go output.run(func() {
 		for {
 			available := false
 			for _, input := range inputs {
-				val, ok := input.recv()
+				val, ok := input.recvIn(c.done)
 				if !ok {
 					continue
 				}
@@ -360,7 +411,7 @@ func (c Stream[T]) RoundRobin(b Stream[T], args ...Stream[T]) Stream[T] {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -375,27 +426,29 @@ func (c Stream[T]) Chunk(n int) chan Stream[T] {
 		return output
 	}
 
-	go func() {
-		defer close(output)
+	go run(c.context(), c.done, output, func() {
 		for {
-			chunk := newStream[T](c.context(), n)
+			// The chunk is never sent to more than it can hold and is closed
+			// before it's handed over, so it needs no draining.
+			chunk := Stream[T]{ctx: c.ctx, done: c.done, c: make(chan T, n)}
 			for i := range n {
 				val, ok := c.recv()
 				if !ok {
 					if i > 0 && c.context().Err() == nil {
 						chunk.close()
-						send(c.context(), output, chunk)
+						output <- chunk
 					}
 					return
 				}
-				chunk.send(val)
+				chunk.c <- val
 			}
 			chunk.close()
-			if !send(c.context(), output, chunk) {
+			output <- chunk
+			if cancelled(c.done) {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -404,20 +457,19 @@ func (c Stream[T]) Chunk(n int) chan Stream[T] {
 func (c Stream[T]) Drop(n int) Stream[T] {
 	output := newStream[T](c.context(), 0)
 
-	go func() {
-		defer output.close()
+	go output.run(func() {
 		for range n {
-			_, ok := c.recv()
+			_, ok := <-c.c
 			if !ok {
 				return
 			}
 		}
-		for val := range c.All() {
+		for val := range c.c {
 			if !output.send(val) {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -432,10 +484,9 @@ func (c Stream[T]) Stride(n int) Stream[T] {
 		return output
 	}
 
-	go func() {
-		defer output.close()
+	go output.run(func() {
 		i := 0
-		for val := range c.All() {
+		for val := range c.c {
 			if i%n == 0 {
 				if !output.send(val) {
 					return
@@ -444,7 +495,7 @@ func (c Stream[T]) Stride(n int) Stream[T] {
 			}
 			i++
 		}
-	}()
+	})
 
 	return output
 }
@@ -459,28 +510,36 @@ func (c Stream[T]) Tail(n int) Stream[T] {
 		return output
 	}
 
-	go func() {
-		defer output.close()
-		tail := make(chan T, n)
+	go output.run(func() {
+		// A ring buffer of the last n values, where i is the oldest value
+		// once the buffer is full.
+		tail := make([]T, 0, min(n, 1024))
 		i := 0
-		for val := range c.All() {
-			if i >= n {
-				<-tail
-			} else {
-				i++
+		for val := range c.c {
+			if len(tail) < n {
+				tail = append(tail, val)
+				continue
 			}
-			send(c.ctx, tail, val)
+			tail[i] = val
+			i++
+			if i == n {
+				i = 0
+			}
 		}
 		if c.context().Err() != nil {
 			return
 		}
-		close(tail)
-		for val := range tail {
+		for _, val := range tail[i:] {
 			if !output.send(val) {
 				return
 			}
 		}
-	}()
+		for _, val := range tail[:i] {
+			if !output.send(val) {
+				return
+			}
+		}
+	})
 
 	return output
 }
@@ -490,28 +549,25 @@ func (c Stream[T]) Tail(n int) Stream[T] {
 // is used for all channels.
 func (c Stream[T]) Zip(b Stream[T], args ...Stream[T]) chan Stream[T] {
 	output := make(chan Stream[T])
-	inputs := []Stream[T]{c, b.withContext(c.context())}
-	for _, arg := range args {
-		inputs = append(inputs, arg.withContext(c.context()))
-	}
+	inputs := append([]Stream[T]{c, b}, args...)
 
-	go func() {
-		defer close(output)
+	go run(c.context(), c.done, output, func() {
 		for {
-			zip := newStream[T](c.context(), len(inputs))
+			zip := Stream[T]{ctx: c.ctx, done: c.done, c: make(chan T, len(inputs))}
 			for _, input := range inputs {
-				val, ok := input.recv()
+				val, ok := recv(c.done, input.c)
 				if !ok {
 					return
 				}
-				zip.send(val)
+				zip.c <- val
 			}
 			zip.close()
-			if !send(c.context(), output, zip) {
+			output <- zip
+			if cancelled(c.done) {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -521,11 +577,10 @@ func (c Stream[T]) Zip(b Stream[T], args ...Stream[T]) chan Stream[T] {
 func (c Stream[T]) PadRight(val T, n int) Stream[T] {
 	output := newStream[T](c.context(), 0)
 
-	go func() {
-		defer output.close()
+	go output.run(func() {
 
 		i := 0
-		for val := range c.All() {
+		for val := range c.c {
 			if !output.send(val) {
 				return
 			}
@@ -541,7 +596,7 @@ func (c Stream[T]) PadRight(val T, n int) Stream[T] {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -551,12 +606,11 @@ func (c Stream[T]) PadRight(val T, n int) Stream[T] {
 func (c Stream[T]) PadLeft(val T, n int) Stream[T] {
 	output := newStream[T](c.context(), 0)
 
-	go func() {
-		defer output.close()
+	go output.run(func() {
 
 		head := make([]T, 0)
 		for range n {
-			e, ok := c.recv()
+			e, ok := <-c.c
 			if !ok {
 				break
 			}
@@ -579,12 +633,12 @@ func (c Stream[T]) PadLeft(val T, n int) Stream[T] {
 			}
 		}
 
-		for e := range c.All() {
+		for e := range c.c {
 			if !output.send(e) {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -594,15 +648,14 @@ func (c Stream[T]) PadLeft(val T, n int) Stream[T] {
 func (c Stream[T]) Tee(f func(T)) Stream[T] {
 	output := newStream[T](c.context(), 0)
 
-	go func() {
-		defer output.close()
-		for val := range c.All() {
+	go output.run(func() {
+		for val := range c.c {
 			f(val)
 			if !output.send(val) {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -612,19 +665,18 @@ func (c Stream[T]) Tee(f func(T)) Stream[T] {
 func (c Stream[T]) Enumerate(n int) chan Enum[T] {
 	output := make(chan Enum[T])
 
-	go func() {
-		defer close(output)
+	go run(c.context(), c.done, output, func() {
 		for val := range c.All() {
-			enum := Enum[T]{
+			output <- Enum[T]{
 				Index: n,
 				Val:   val,
 			}
-			if !send(c.context(), output, enum) {
+			if cancelled(c.done) {
 				return
 			}
 			n++
 		}
-	}()
+	})
 
 	return output
 }
@@ -634,9 +686,8 @@ func (c Stream[T]) Enumerate(n int) chan Enum[T] {
 func (c Stream[T]) Find(needle T) Stream[T] {
 	output := newStream[T](c.context(), 0)
 
-	go func() {
-		defer output.close()
-		for val := range c.All() {
+	go output.run(func() {
+		for val := range c.c {
 			if val == needle {
 				if !output.send(val) {
 					return
@@ -644,12 +695,12 @@ func (c Stream[T]) Find(needle T) Stream[T] {
 				break
 			}
 		}
-		for val := range c.All() {
+		for val := range c.c {
 			if !output.send(val) {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -659,9 +710,8 @@ func (c Stream[T]) Find(needle T) Stream[T] {
 func (c Stream[T]) Substitute(old, new T) Stream[T] {
 	output := newStream[T](c.context(), 0)
 
-	go func() {
-		defer output.close()
-		for val := range c.All() {
+	go output.run(func() {
+		for val := range c.c {
 			if val == old {
 				val = new
 			}
@@ -669,7 +719,7 @@ func (c Stream[T]) Substitute(old, new T) Stream[T] {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -679,9 +729,8 @@ func (c Stream[T]) Substitute(old, new T) Stream[T] {
 func (c Stream[T]) Skip(needle T) Stream[T] {
 	output := newStream[T](c.context(), 0)
 
-	go func() {
-		defer output.close()
-		for val := range c.All() {
+	go output.run(func() {
+		for val := range c.c {
 			if val == needle {
 				continue
 			}
@@ -689,7 +738,7 @@ func (c Stream[T]) Skip(needle T) Stream[T] {
 				return
 			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -703,30 +752,39 @@ func (c Stream[T]) Throttle(n int, d time.Duration) Stream[T] {
 
 	output := newStream[T](c.context(), 0)
 
-	go func() {
-		defer output.close()
+	go output.run(func() {
 
 		// The times of the last n sends, used as a ring buffer. Each slot
 		// holds the time of the send n sends ago, or zero if there wasn't one.
 		sent := make([]time.Time, n)
 		i := 0
 
-		for val := range c.All() {
-			if wait := time.Until(sent[i].Add(d)); wait > 0 {
-				select {
-				case <-time.After(wait):
-				case <-c.context().Done():
-					return
+		// The time of the last send. The current time is never earlier, so if
+		// the window has passed by this time there's no need to read the clock.
+		var last time.Time
+
+		for val := range c.c {
+			if next := sent[i].Add(d); !sent[i].IsZero() && next.After(last) {
+				if wait := time.Until(next); wait > 0 {
+					select {
+					case <-time.After(wait):
+					case <-c.done:
+						return
+					}
 				}
 			}
 
 			if !output.send(val) {
 				return
 			}
-			sent[i] = time.Now()
-			i = (i + 1) % n
+			last = time.Now()
+			sent[i] = last
+			i++
+			if i == n {
+				i = 0
+			}
 		}
-	}()
+	})
 
 	return output
 }
@@ -736,20 +794,19 @@ func (c Stream[T]) Throttle(n int, d time.Duration) Stream[T] {
 // streaming.
 func (c Stream[T]) Distinct() Stream[T] {
 	output := newStream[T](c.context(), 0)
-	values := make(map[T]*T)
 
-	go func() {
-		defer output.close()
-		for val := range c.All() {
+	go output.run(func() {
+		values := make(map[T]struct{})
+		for val := range c.c {
 			if _, ok := values[val]; ok {
 				continue
 			}
 			if !output.send(val) {
 				return
 			}
-			values[val] = nil
+			values[val] = struct{}{}
 		}
-	}()
+	})
 
 	return output
 }
@@ -759,10 +816,20 @@ func (c Stream[T]) Distinct() Stream[T] {
 func (c Stream[T]) Buffer(n int) Stream[T] {
 	output := newStream[T](c.context(), max(n, 0))
 
+	// Values that are buffered when the context is cancelled can still be
+	// received, so the output isn't drained on cancellation like other stages.
+	// The send selects on the context instead.
 	go func() {
 		defer output.close()
-		for val := range c.All() {
-			if !output.send(val) {
+		for val := range c.c {
+			select {
+			case output.c <- val:
+				continue
+			default:
+			}
+			select {
+			case output.c <- val:
+			case <-output.done:
 				return
 			}
 		}
